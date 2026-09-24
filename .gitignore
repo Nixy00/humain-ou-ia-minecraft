@@ -1,0 +1,22 @@
+# --- Serveur Minecraft & Fichiers lourds ---
+*.jar
+server/world/
+server/world_nether/
+server/world_the_end/
+server/logs/
+server/crash-reports/
+server/cache/
+server/libraries/
+
+# --- Dépendances Node.js (Bots Mineflayer) ---
+node_modules/
+npm-debug.log*
+
+# --- Clés d'API & Fichiers de configuration sensibles ---
+.env
+
+# --- Fichiers système et IDE ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
