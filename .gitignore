@@ -20,3 +20,7 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# --- Client RCON ---
+server/rcon
+server/rcon-*
