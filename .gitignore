@@ -7,6 +7,13 @@ server/logs/
 server/crash-reports/
 server/cache/
 server/libraries/
+server/versions/
+
+# --- Données temporaires & Caches serveur ---
+server/usercache.json
+server/plugins/bStats/
+*.tar.gz
+*.zip
 
 # --- Dépendances Node.js (Bots Mineflayer) ---
 node_modules/
