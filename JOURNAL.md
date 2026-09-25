@@ -25,4 +25,12 @@
 * **Travail réalisé :**
     * Rédaction et publication du fichier `README.md` sur le dépôt GitLab (présentation du projet, architecture ciblée, structure des dossiers).
     * Initialisation du journal de bord (`JOURNAL.md`).
-    * Reprise de la configuration de la VM Ubuntu sur OpenNebula.
+    * Reprise de la configuration de la VM Ubuntu sur OpenNebula. Installation de OpenJDK 21 Headless.
+    * Création et configuration de l'utilisateur dédié `minecraft` sans privilèges `sudo` par des règles RBAC plus strict pour les utilisateurs.
+
+#### Jeudi 24 septembre 2026
+* **Objectif de la journée :** Déploiement du serveur PaperMC, sécurisation de l'environnement et mise en place du contrôle RCON.
+* **Travail réalisé :**
+    * Déploiement du serveur PaperMC 1.20.4.
+    * Automatisation de la gestion du serveur via un service `systemd --user` (démarrage, arrêt, redémarrage en arrière-plan).
+    * Configuration et activation du protocole RCON (Remote Console, protocole TCP permettant l'exécution de commandes d'administration à distance sans être connecté au jeu).
