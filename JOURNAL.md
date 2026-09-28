@@ -34,3 +34,9 @@
     * Déploiement du serveur PaperMC 1.20.4.
     * Automatisation de la gestion du serveur via un service `systemd --user` (démarrage, arrêt, redémarrage en arrière-plan).
     * Configuration et activation du protocole RCON (Remote Console, protocole TCP permettant l'exécution de commandes d'administration à distance sans être connecté au jeu).
+
+#### Vendredi 25 septembre 2026
+* **Objectif de la journée :** Développement de l'assistant autonome et sécurisation des flux de mouvement.
+* **Travail réalisé :**
+    * Développement d'une première version (algorithmique) de l'assistant Minecraft utilisant des commandes en langage naturel.
+    * Application des correctifs de mouvement et de l'anti-knockback pour stabiliser la connexion du bot sur le serveur PaperMC.
