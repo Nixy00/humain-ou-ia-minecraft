@@ -1,0 +1,82 @@
+// Perception : transforme l'état du jeu vu par le client en un texte court pour le modèle.
+// L'agent ne voit que ce qu'un joueur humain voit (son client) : aucune donnée serveur privilégiée.
+
+const INTERESTING_BLOCK = /(_log|_ore|^stone|^cobblestone|^crafting_table|^furnace|^chest|^sand|^gravel|^clay|^wheat|^sugar_cane|^pumpkin|^melon)$/;
+
+function isHostile(e) {
+  return e.type === 'hostile' || e.kind === 'Hostile mobs';
+}
+
+function round(n) {
+  return Math.round(n);
+}
+
+function agoText(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  return s < 60 ? `il y a ${s} s` : `il y a ${Math.round(s / 60)} min`;
+}
+
+function inventorySummary(bot) {
+  const counts = {};
+  for (const it of bot.inventory.items()) counts[it.name] = (counts[it.name] ?? 0) + it.count;
+  const entries = Object.entries(counts);
+  return entries.length ? entries.map(([n, c]) => `${n} x${c}`).join(', ') : 'vide';
+}
+
+function nearbyBlocks(bot, mcData, radius = 16) {
+  if (!nearbyBlocks.ids) {
+    nearbyBlocks.ids = mcData.blocksArray.filter((b) => INTERESTING_BLOCK.test(b.name)).map((b) => b.id);
+  }
+  const positions = bot.findBlocks({ matching: nearbyBlocks.ids, maxDistance: radius, count: 200 });
+  const groups = {};
+  for (const pos of positions) {
+    const name = bot.blockAt(pos)?.name;
+    if (!name) continue;
+    const d = bot.entity.position.distanceTo(pos);
+    const g = (groups[name] ??= { count: 0, nearest: Infinity });
+    g.count++;
+    g.nearest = Math.min(g.nearest, d);
+  }
+  const entries = Object.entries(groups).sort((a, b) => a[1].nearest - b[1].nearest);
+  return entries.length ? entries.map(([n, g]) => `${n} (${g.count}, le plus proche à ${round(g.nearest)} blocs)`).join(', ') : 'rien de notable';
+}
+
+function observe(bot, mcData, memory) {
+  const me = bot.entity.position;
+  const others = Object.values(bot.players).filter((p) => p.username !== bot.username);
+  const visible = others
+    .filter((p) => p.entity)
+    .map((p) => `${p.username} à ${round(me.distanceTo(p.entity.position))} blocs`);
+  const hostiles = Object.values(bot.entities)
+    .filter((e) => isHostile(e) && me.distanceTo(e.position) < 16)
+    .map((e) => `${e.name} à ${round(me.distanceTo(e.position))} blocs`);
+  const tod = bot.time?.timeOfDay ?? 0;
+  const moment = tod < 12300 || tod > 23850 ? 'jour' : 'nuit';
+
+  const lines = [
+    `Toi : ${bot.username}. Vie ${round(bot.health)}/20, faim ${round(bot.food)}/20. Position x=${round(me.x)} y=${round(me.y)} z=${round(me.z)}. Il fait ${moment}.`,
+    `Inventaire : ${inventorySummary(bot)}.`,
+    `Joueurs connectés : ${others.map((p) => p.username).join(', ') || 'aucun'}.`,
+    `Joueurs visibles : ${visible.join(', ') || 'aucun'}.`,
+    `Monstres proches : ${hostiles.join(', ') || 'aucun'}.`,
+    `Blocs utiles autour : ${nearbyBlocks(bot, mcData)}.`,
+  ];
+  if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
+
+  lines.push('', 'Derniers évènements (du plus ancien au plus récent) :');
+  if (memory.events.length === 0) lines.push('- aucun');
+  for (const e of memory.events) {
+    if (e.type === 'chat') lines.push(`- [chat, ${agoText(e.t)}] <${e.from}> ${e.text}`);
+    else if (e.type === 'whisper') lines.push(`- [message privé de ${e.from}, ${agoText(e.t)}] ${e.text}`);
+    else lines.push(`- [${e.type}, ${agoText(e.t)}] ${e.text}`);
+  }
+
+  lines.push('', 'Tes dernières actions :');
+  if (memory.actions.length === 0) lines.push('- aucune');
+  for (const a of memory.actions) {
+    lines.push(`- ${a.name} ${JSON.stringify(a.args)} -> ${a.ok ? 'réussi' : 'échec'} : ${a.result} (${agoText(a.t)})`);
+  }
+  return lines.join('\n');
+}
+
+module.exports = { observe, isHostile };
