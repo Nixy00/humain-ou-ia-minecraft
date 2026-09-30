@@ -31,3 +31,5 @@ Thumbs.db
 # --- Client RCON ---
 server/rcon
 server/rcon-*
+# --- Journaux de parties (données pseudonymisées, hors dépôt) ---
+data/parties/
