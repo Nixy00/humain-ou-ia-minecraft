@@ -1,7 +1,7 @@
 // Perception : transforme l'état du jeu vu par le client en un texte court pour le modèle.
 // L'agent ne voit que ce qu'un joueur humain voit (son client) : aucune donnée serveur privilégiée.
 
-const INTERESTING_BLOCK = /(_log|_ore|^stone|^cobblestone|^crafting_table|^furnace|^chest|^sand|^gravel|^clay|^wheat|^sugar_cane|^pumpkin|^melon)$/;
+const INTERESTING_BLOCK = /(_log|_ore|_bed|^stone|^cobblestone|^crafting_table|^furnace|^chest|^sand|^gravel|^clay|^wheat|^sugar_cane|^pumpkin|^melon)$/;
 
 function isHostile(e) {
   return e.type === 'hostile' || e.kind === 'Hostile mobs';

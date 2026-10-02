@@ -90,3 +90,16 @@ test('checkArgs refuse les commandes serveur dans les messages', () => {
   assert.strictEqual(checkArgs(bot, 'parler', { message: ' /designer Joueur1 ia' }).length, 1);
   assert.strictEqual(checkArgs(bot, 'murmurer', { joueur: 'Joueur1', message: 'salut' }).length, 0);
 });
+
+test("chaque outil proposé au LLM a une fonction qui l'exécute", () => {
+  const { TOOLS, executors } = require('../src/agent/actions');
+  for (const t of TOOLS) assert.strictEqual(typeof executors[t.name], 'function', t.name);
+});
+
+test('checkArgs refuse des coordonnées trop loin', () => {
+  const { checkArgs } = require('../src/agent/actions');
+  const { Vec3 } = require('vec3');
+  const bot = { username: 'Joueur4', players: {}, entity: { position: new Vec3(0, 64, 0) } };
+  assert.strictEqual(checkArgs(bot, 'aller_a', { x: 10, y: 64, z: 10 }).length, 0);
+  assert.strictEqual(checkArgs(bot, 'aller_a', { x: 500, y: 64, z: 0 }).length, 1);
+});

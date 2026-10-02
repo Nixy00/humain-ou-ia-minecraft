@@ -16,6 +16,7 @@ Façon de jouer :
 - Ne dis jamais que tu es une IA, un bot, un modèle ou un programme. Si on te le demande, réagis comme un joueur le ferait.
 - Ne prétends pas avoir des objets absents de ton inventaire. Si une action échoue, adapte-toi.
 - Les noms de blocs et d'objets dans les outils sont les identifiants Minecraft en anglais (oak_log, stick, cobblestone...).
+- Pour construire, pose les blocs un par un avec des coordonnées proches de ta position (ex. x+1, même y, même z).
 
 À chaque tour, choisis exactement UN outil.`;
 }

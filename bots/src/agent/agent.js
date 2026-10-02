@@ -9,6 +9,7 @@ const { observe } = require('./perception');
 const { TOOLS, execute, checkArgs } = require('./actions');
 const { systemPrompt, turnPrompt, votePrompt } = require('./prompt');
 const { messageDelayMs, uniform } = require('./humanizer');
+const { startReflexes } = require('./reflexes');
 const { callTool } = require('../llm/structured');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -52,6 +53,8 @@ class Agent {
       this.log('connecté');
       this.logger.write('events', { agent: this.username, type: 'connexion' });
       this.tickTimer = setInterval(() => this.schedule('minuterie (rien ne s\'est passé récemment)', 0), this.cfg.agent.tickMs);
+      // Les réflexes sont journalisés et ajoutés aux évènements vus par le LLM (sans déclencher de décision).
+      this.reflexTimer = startReflexes(bot, (type, detail) => this.onEvent({ type: 'reflexe', text: `${type} : ${detail}` }, null));
       this.schedule('tu viens de te connecter', uniform(3000, 8000));
     });
 
@@ -71,7 +74,9 @@ class Agent {
         this.vote(text);
         return;
       }
-      this.onEvent({ type: 'serveur', text }, 'message du serveur');
+      // Les arrivées/départs de joueurs sont notés mais ne déclenchent pas de décision (trop fréquents).
+      const arriveeDepart = / (joined|left) the game$/.test(text);
+      this.onEvent({ type: 'serveur', text }, arriveeDepart ? null : 'message du serveur');
     });
     bot.on('death', () => this.onEvent({ type: 'mort', text: 'tu es mort et tu as réapparu' }, 'tu viens de mourir'));
     bot.on('kicked', (reason) => this.logger.write('errors', { agent: this.username, message: 'expulsé', detail: String(reason) }));
@@ -218,6 +223,7 @@ class Agent {
 
   onEnd(reason) {
     clearInterval(this.tickTimer);
+    clearInterval(this.reflexTimer);
     clearTimeout(this.decideTimer);
     this.mcData = null;
     this.busy = false;
