@@ -13,14 +13,15 @@ function startReflexes(bot, style, actionEnCours, onReflexe) {
   let immobileDepuis = Date.now();
   let prochainRegard = Date.now() + 5000;
 
-  return setInterval(() => {
+  function reagir() {
     if (!bot.entity) return;
     const pos = bot.entity.position;
     const maintenant = Date.now();
 
     // 1. Ne pas se noyer : sauter quand la tete est dans l'eau (si on ne marche pas deja).
     const tete = bot.blockAt(pos.offset(0, 1, 0));
-    const dansEau = tete && tete.name === 'water' && !bot.pathfinder.isMoving();
+    // Boolean() : apres une mort le bloc n'est pas encore charge (null), et setControlState plante si ce n'est pas un vrai/faux.
+    const dansEau = Boolean(tete && tete.name === 'water' && !bot.pathfinder.isMoving());
     if (dansEau !== sauteDansEau) {
       bot.setControlState('jump', dansEau);
       sauteDansEau = dansEau;
@@ -65,6 +66,15 @@ function startReflexes(bot, style, actionEnCours, onReflexe) {
         bot.look(bot.entity.yaw + uniform(-0.6, 0.6), uniform(-0.3, 0.2)).catch(() => {});
       }
       prochainRegard = maintenant + uniform(3000, 9000);
+    }
+  }
+
+  // Une erreur dans un reflexe ne doit pas faire planter tout le programme (et les autres bots avec).
+  return setInterval(() => {
+    try {
+      reagir();
+    } catch (err) {
+      onReflexe('erreur', err.message);
     }
   }, 100);
 }

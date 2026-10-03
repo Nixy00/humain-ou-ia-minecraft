@@ -200,3 +200,22 @@ test('fil de conversation : messages reçus et envoyés dans l\'ordre, sans les 
   assert.ok(texte.split('Autres évènements')[1].includes('auto_defense'));
   assert.ok(!texte.split('Autres évènements')[0].includes('auto_defense'));
 });
+
+test('réflexes : pas de plantage quand le bloc au-dessus de la tête est null (après une mort)', async () => {
+  const { startReflexes } = require('../src/agent/reflexes');
+  const { Vec3 } = require('vec3');
+  const erreurs = [];
+  const bot = {
+    entity: { position: new Vec3(0, 64, 0), yaw: 0 },
+    blockAt: () => null, // bloc pas encore chargé
+    pathfinder: { isMoving: () => false },
+    nearestEntity: () => null,
+    look: async () => {},
+    // comme mineflayer : refuse tout ce qui n'est pas un vrai booléen
+    setControlState: (c, etat) => { assert.strictEqual(typeof etat, 'boolean'); },
+  };
+  const timer = startReflexes(bot, { rateCoup: 0 }, () => null, (type, detail) => erreurs.push(`${type} ${detail}`));
+  await new Promise((r) => setTimeout(r, 250));
+  clearInterval(timer);
+  assert.deepStrictEqual(erreurs, []);
+});
