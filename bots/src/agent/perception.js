@@ -46,7 +46,11 @@ function observe(bot, mcData, memory) {
   const others = Object.values(bot.players).filter((p) => p.username !== bot.username);
   const visible = others
     .filter((p) => p.entity)
-    .map((p) => `${p.username} à ${round(me.distanceTo(p.entity.position))} blocs`);
+    .map((p) => {
+      // Le modèle lisait mal "à 2 blocs" et disait "je te vois pas" : on l'écrit clairement.
+      const d = round(me.distanceTo(p.entity.position));
+      return d <= 8 ? `${p.username} juste à côté de toi (${d} blocs, tu le vois)` : `${p.username} à ${d} blocs (tu le vois)`;
+    });
   const hostiles = Object.values(bot.entities)
     .filter((e) => isHostile(e) && me.distanceTo(e.position) < 16)
     .map((e) => `${e.name} à ${round(me.distanceTo(e.position))} blocs`);
