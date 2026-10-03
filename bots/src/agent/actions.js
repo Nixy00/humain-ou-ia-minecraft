@@ -61,6 +61,10 @@ function checkArgs(bot, name, args) {
   // bot.chat exécute tout texte commençant par "/" comme une commande serveur (ex. /designer) :
   // le modèle, ou un joueur qui le manipule par le chat, pourrait voter ou agir hors des outils.
   if (typeof args.message === 'string' && args.message.trimStart().startsWith('/')) errors.push('un message ne peut pas commencer par "/"');
+  // Sur un vrai serveur, 97 % des messages font 10 mots ou moins : au-delà de 12, on fait reformuler.
+  if (typeof args.message === 'string' && args.message.trim().split(/\s+/).length > 12) {
+    errors.push('message trop long, un joueur écrit court (quelques mots)');
+  }
   // Un joueur n'écrit pas "oak_log" dans le chat : on refuse et le modèle reformule.
   if (typeof args.message === 'string' && /[a-z]+_[a-z]+/i.test(args.message)) {
     errors.push('écris comme un joueur, sans identifiant avec "_" (ex. oak_log -> bois)');

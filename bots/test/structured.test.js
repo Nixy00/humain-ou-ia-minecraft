@@ -90,6 +90,7 @@ test('checkArgs refuse les commandes serveur dans les messages', () => {
   assert.strictEqual(checkArgs(bot, 'parler', { message: ' /designer Joueur1 ia' }).length, 1);
   assert.strictEqual(checkArgs(bot, 'murmurer', { joueur: 'Joueur1', message: 'salut' }).length, 0);
   assert.strictEqual(checkArgs(bot, 'parler', { message: 'jai 3 oak_log' }).length, 1);
+  assert.strictEqual(checkArgs(bot, 'parler', { message: 'un deux trois quatre cinq six sept huit neuf dix onze douze treize' }).length, 1);
 });
 
 test("chaque outil proposé au LLM a une fonction qui l'exécute", () => {
