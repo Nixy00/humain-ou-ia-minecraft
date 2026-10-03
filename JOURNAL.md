@@ -106,3 +106,15 @@
     * Correction : messages courts (plus de 12 mots = refusé), argot environ 1 message sur 20, exemples de messages raccourcis pour chaque personnalité.
     * Pour le français, le corpus 88milSMS (88 000 SMS authentiques anonymisés, licence CC BY 4.0, plateforme Ortolang/CoMeRe) pourra servir à calibrer les abréviations françaises.
     * On ne récupère pas les conversations de serveurs publics : les joueurs n'ont pas donné leur accord, ce qui irait contre la règle du sujet sur le consentement et la pseudonymisation. On s'appuie sur des corpus publics sous licence et sur nos propres parties.
+    * **Sources des recherches de la semaine :**
+        * Jones & Bergen, *People cannot distinguish GPT-4 from a human in a Turing test*, UC San Diego, arXiv 2405.08007 — https://arxiv.org/abs/2405.08007 (formule de délai des messages, consignes de personnage, raisons pour lesquelles une IA est repérée).
+        * *The Impact of Response Latency and Task Type on Human-LLM Interaction and Perception*, arXiv 2604.06183 — https://arxiv.org/abs/2604.06183 (latence et détection).
+        * Bartle, *Hearts, Clubs, Diamonds, Spades: Players Who Suit MUDs*, Journal of MUD Research, 1996 — https://en.wikipedia.org/wiki/Bartle_taxonomy_of_player_types
+        * Yee, *Motivations for Play in Online Games*, 2006 — https://nickyee.com/pubs/Yee%20-%20Motivations%20(2007).pdf (critique de Bartle : motivations combinées).
+        * MISHRI, bot Minecraft "humain" — https://github.com/emilyspringerton/MISHRI (idées seulement, licence pas claire).
+        * minecraft-ai-companion (licence MIT) — https://github.com/kustash01/minecraft-ai-companion (probabilités de réponse, fautes de frappe, bruit de visée).
+        * Mindcraft (licence MIT) — https://github.com/mindcraft-bots/mindcraft (actions et réflexes repris et simplifiés).
+        * Minecraft Server Chat, Hugging Face, licence CC0 — https://huggingface.co/datasets/declip/Minecraft-Server-Chat (statistiques de longueur et d'argot).
+        * Corpus 88milSMS, CoMeRe/Ortolang, licence CC BY 4.0 — https://repository.ortolang.fr/api/content/comere/v3.2/cmr-88milsms.html
+        * Vocabulaire des joueurs francophones : forum jeuxvideo.com (débat établi / table de craft / table de travail), glossaire JeuxOnline — https://minecraft.jeuxonline.info/article/9660/glossaire-minecraft
+        * Temps de réaction humain (~250 ms) — https://humanbenchmark.me/tests/reactiontime/average ; CPS en PvP Minecraft — https://click-battle.com/blog/best-cps-for-minecraft-pvp ; vitesse de frappe des joueurs — https://typingtest.now/faq/typing-speed-for-gamers/
