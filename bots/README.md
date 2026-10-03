@@ -28,7 +28,8 @@ npm start -- Joueur4        # lance un seul agent
 | `src/agent/perception.js` | État du jeu vu par le client -> texte pour le modèle |
 | `src/agent/actions.js` | Outils proposés au modèle et leur exécution Mineflayer |
 | `src/agent/prompt.js` | Consignes système, prompt de tour, prompt de désignation |
-| `src/agent/humanizer.js` | Délais de réaction et de frappe (paramètre expérimental) |
+| `src/agent/humanizer.js` | Ce qui rend les bots moins parfaits : délais, fautes de frappe, coups ratés |
+| `src/agent/reflexes.js` | Réflexes sans LLM : se défendre, ne pas se noyer, se débloquer, regarder autour |
 | `src/agent/agent.js` | Boucle évènement -> perception -> décision -> action, votes, reconnexion |
 | `src/observability/logger.js` | Journaux JSONL de la partie |
 

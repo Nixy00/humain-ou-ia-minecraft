@@ -103,3 +103,22 @@ test('checkArgs refuse des coordonnées trop loin', () => {
   assert.strictEqual(checkArgs(bot, 'aller_a', { x: 10, y: 64, z: 10 }).length, 0);
   assert.strictEqual(checkArgs(bot, 'aller_a', { x: 500, y: 64, z: 0 }).length, 1);
 });
+
+test('délai des messages : jamais négatif et 12 s maximum', () => {
+  const { STYLE_DEFAUT, messageDelayMs } = require('../src/agent/humanizer');
+  const long = 'x'.repeat(300);
+  for (let i = 0; i < 100; i++) {
+    const d = messageDelayMs(long, long, 0, STYLE_DEFAUT);
+    assert.ok(d >= 0 && d <= 12000, String(d));
+  }
+  assert.strictEqual(messageDelayMs('salut', '', 60000, STYLE_DEFAUT), 0);
+});
+
+test('faute de frappe : inverse deux lettres et propose parfois la correction', () => {
+  const { fauteDeFrappe } = require('../src/agent/humanizer');
+  assert.deepStrictEqual(fauteDeFrappe('salut tout le monde', 0), { texte: 'salut tout le monde', correction: null });
+  const f = fauteDeFrappe('pioche', 1);
+  assert.strictEqual(f.texte.length, 6);
+  assert.deepStrictEqual([...f.texte].sort(), [...'pioche'].sort());
+  assert.ok(f.correction === null || f.correction === '*pioche');
+});

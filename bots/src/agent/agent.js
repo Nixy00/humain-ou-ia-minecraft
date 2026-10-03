@@ -8,16 +8,18 @@ const minecraftData = require('minecraft-data');
 const { observe } = require('./perception');
 const { TOOLS, execute, checkArgs } = require('./actions');
 const { systemPrompt, turnPrompt, votePrompt } = require('./prompt');
-const { messageDelayMs, uniform } = require('./humanizer');
+const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, delaiAvantAction, uniform } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
 const { callTool } = require('../llm/structured');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 class Agent {
-  constructor({ username, persona }, { cfg, gateway, logger }) {
+  constructor({ username, persona, style }, { cfg, gateway, logger }) {
     this.username = username;
     this.persona = persona;
+    this.style = { ...STYLE_DEFAUT, ...style };
+    this.actionEnCours = null;
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
@@ -54,13 +56,16 @@ class Agent {
       this.logger.write('events', { agent: this.username, type: 'connexion' });
       this.tickTimer = setInterval(() => this.schedule('minuterie (rien ne s\'est passé récemment)', 0), this.cfg.agent.tickMs);
       // Les réflexes sont journalisés et ajoutés aux évènements vus par le LLM (sans déclencher de décision).
-      this.reflexTimer = startReflexes(bot, (type, detail) => this.onEvent({ type: 'reflexe', text: `${type} : ${detail}` }, null));
+      this.reflexTimer = startReflexes(bot, this.style, () => this.actionEnCours, (type, detail) => this.onEvent({ type: 'reflexe', text: `${type} : ${detail}` }, null));
       this.schedule('tu viens de te connecter', uniform(3000, 8000));
     });
 
     bot.on('chat', (from, text) => {
       if (from === this.username) return;
-      this.onEvent({ type: 'chat', from, text }, `message de ${from}`);
+      // Un joueur ne réagit pas à tout : toujours si on lui parle, sinon selon son caractère (style.bavard).
+      const pourMoi = text.toLowerCase().includes(this.username.toLowerCase());
+      const reagir = pourMoi || !this.cfg.agent.humanize || Math.random() < this.style.bavard;
+      this.onEvent({ type: 'chat', from, text }, reagir ? `message de ${from}` : null);
     });
     bot.on('whisper', (from, text) => {
       if (from === this.username) return;
@@ -137,8 +142,18 @@ class Agent {
       });
 
       let delay = 0;
-      if (choice.name === 'parler' || choice.name === 'murmurer') {
-        delay = messageDelayMs(args.message, llmMs, this.cfg.agent);
+      let correction = null;
+      if (this.cfg.agent.humanize) {
+        if (choice.name === 'parler' || choice.name === 'murmurer') {
+          // Faute de frappe possible, puis le temps de lire, réfléchir et taper.
+          const f = fauteDeFrappe(args.message, this.style.fautes);
+          args.message = f.texte;
+          correction = f.correction;
+          const dernierMessage = [...this.memory.events].reverse().find((e) => e.type === 'chat' || e.type === 'whisper');
+          delay = messageDelayMs(args.message, dernierMessage ? dernierMessage.text : '', llmMs, this.style);
+        } else {
+          delay = delaiAvantAction();
+        }
         await sleep(delay);
       }
       // Si le bot s'est déconnecté pendant l'attente, on abandonne l'action.
@@ -147,11 +162,19 @@ class Agent {
         return;
       }
       const tAction = Date.now();
-      const res = await execute(this.bot,choice.name, args, { mcData: this.mcData }, this.cfg.agent.actionTimeoutMs);
+      this.actionEnCours = choice.name;
+      const res = await execute(this.bot, choice.name, args, { mcData: this.mcData, style: this.style }, this.cfg.agent.actionTimeoutMs);
+      this.actionEnCours = null;
       this.logger.write('actions', {
         agent: this.username, decision_id: decisionId, tool: choice.name, args,
         ok: res.ok, result: res.result, humanize_delay_ms: Math.round(delay), duration_ms: Date.now() - tAction,
       });
+      // Après une faute de frappe, le joueur envoie parfois la correction ("*mot").
+      if (correction && res.ok) {
+        await sleep(uniform(1500, 3000));
+        bot.chat(choice.name === 'murmurer' ? `/msg ${args.joueur} ${correction}` : correction);
+        this.logger.write('actions', { agent: this.username, decision_id: decisionId, tool: 'correction', args: { message: correction }, ok: true });
+      }
       this.memory.actions.push({ name: choice.name, args, ok: res.ok, result: res.result, t: Date.now() });
       if (this.memory.actions.length > 5) this.memory.actions.shift();
       this.log(`${choice.name} ${JSON.stringify(args)} -> ${res.result}`);
@@ -159,6 +182,7 @@ class Agent {
       this.logger.write('errors', { agent: this.username, decision_id: decisionId, message: 'décision', detail: err.stack });
     } finally {
       this.busy = false;
+      this.actionEnCours = null;
       if (this.pendingReason) {
         const r = this.pendingReason;
         this.pendingReason = null;

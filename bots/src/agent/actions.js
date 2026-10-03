@@ -9,6 +9,7 @@
 const { goals } = require('mineflayer-pathfinder');
 const { Vec3 } = require('vec3');
 const { isHostile } = require('./perception');
+const { frapper, delaiEntreCoups } = require('./humanizer');
 
 // Champ commun : le modèle peut noter son objectif courant, réaffiché au tour suivant.
 const OBJECTIF = { type: 'string', maxLength: 120, description: 'Ton objectif actuel en quelques mots (optionnel).' };
@@ -164,7 +165,7 @@ const executors = {
     return `${food.name} mangé`;
   },
 
-  async se_defendre(bot) {
+  async se_defendre(bot, args, { style }) {
     const mob = bot.nearestEntity((e) => isHostile(e) && bot.entity.position.distanceTo(e.position) < 12);
     if (!mob) throw new Error('aucun monstre proche');
     const weapon = bot.inventory.items().find((i) => i.name.endsWith('_sword')) ?? bot.inventory.items().find((i) => i.name.endsWith('_axe'));
@@ -172,11 +173,8 @@ const executors = {
     bot.pathfinder.setGoal(new goals.GoalFollow(mob, 2), true);
     const end = Date.now() + 15000;
     while (mob.isValid && Date.now() < end) {
-      if (bot.entity.position.distanceTo(mob.position) < 3.5) {
-        await bot.lookAt(mob.position.offset(0, mob.height * 0.8, 0));
-        bot.attack(mob);
-      }
-      await sleep(650); // cadence d'attaque d'un joueur, pas plus
+      if (bot.entity.position.distanceTo(mob.position) < 3.5) frapper(bot, mob, style.rateCoup);
+      await sleep(delaiEntreCoups());
     }
     bot.pathfinder.setGoal(null);
     return mob.isValid ? `${mob.name} toujours en vie` : `${mob.name} éliminé`;

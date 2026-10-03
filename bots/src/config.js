@@ -62,9 +62,6 @@ module.exports = {
     actionTimeoutMs: envInt('AGENT_ACTION_TIMEOUT_MS', 60000),
     maxEvents: envInt('AGENT_MAX_EVENTS', 15),
     humanize: envBool('AGENT_HUMANIZE', true),
-    reactionMinMs: envInt('AGENT_REACTION_MIN_MS', 1500),
-    reactionMaxMs: envInt('AGENT_REACTION_MAX_MS', 4000),
-    typingCps: envFloat('AGENT_TYPING_CPS', 6),
     joinDelayMaxMs: envInt('AGENT_JOIN_DELAY_MAX_MS', 20000),
   },
 };
