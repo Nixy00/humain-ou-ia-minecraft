@@ -26,6 +26,7 @@ logger.write('events', {
   model: cfg.llm.model,
   mode: cfg.llm.mode,
   humanize: cfg.agent.humanize,
+  archetypes: selected.map((p) => `${p.username} : ${p.archetype}`),
 });
 console.log(`Partie ${cfg.game.id} : journaux dans ${cfg.game.logDir}`);
 
