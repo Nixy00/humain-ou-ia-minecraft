@@ -114,6 +114,16 @@ class Agent {
     if (reason) this.schedule(reason, this.cfg.agent.chatDebounceMs);
   }
 
+  // Un joueur ne renvoie pas trois fois le même message : on refuse un message
+  // qui commence comme un des 3 derniers, et le modèle doit dire autre chose.
+  verifierRepetition(name, args) {
+    if (name !== 'parler' && name !== 'murmurer') return [];
+    // normalize('NFD') sépare les accents des lettres, puis on ne garde que a-z ("où" devient "ou").
+    const debut = (t) => t.normalize('NFD').toLowerCase().replace(/[^a-z]/g, '').slice(0, 12);
+    const derniers = this.memory.actions.filter((a) => a.name === name).slice(-3).map((a) => debut(a.args.message));
+    return derniers.includes(debut(args.message)) ? ['tu as déjà écrit presque la même chose, dis autre chose ou attends'] : [];
+  }
+
   // Regroupe les évènements rapprochés : une seule décision après `delayMs` de calme.
   schedule(reason, delayMs) {
     if (!this.mcData) return;
@@ -142,7 +152,7 @@ class Agent {
         ],
         tools: TOOLS,
         meta: { agent: this.username, decisionId, kind: 'decision' },
-        extraCheck: (name, args) => checkArgs(this.bot, name, args),
+        extraCheck: (name, args) => [...checkArgs(this.bot, name, args), ...this.verifierRepetition(name, args)],
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
       });
       const llmMs = Date.now() - t0;
