@@ -8,7 +8,7 @@ const minecraftData = require('minecraft-data');
 const { observe } = require('./perception');
 const { TOOLS, execute, checkArgs } = require('./actions');
 const { systemPrompt, turnPrompt, votePrompt } = require('./prompt');
-const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, delaiAvantAction, uniform } = require('./humanizer');
+const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, delaiAvantAction, uniform } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
 const { callTool } = require('../llm/structured');
 
@@ -146,7 +146,7 @@ class Agent {
       if (this.cfg.agent.humanize) {
         if (choice.name === 'parler' || choice.name === 'murmurer') {
           // Faute de frappe possible, puis le temps de lire, réfléchir et taper.
-          const f = fauteDeFrappe(args.message, this.style.fautes);
+          const f = fauteDeFrappe(ecrireCommeJoueur(args.message), this.style.fautes);
           args.message = f.texte;
           correction = f.correction;
           const dernierMessage = [...this.memory.events].reverse().find((e) => e.type === 'chat' || e.type === 'whisper');

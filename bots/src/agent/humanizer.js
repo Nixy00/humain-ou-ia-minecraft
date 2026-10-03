@@ -48,6 +48,11 @@ function fauteDeFrappe(texte, chance) {
   return { texte: mots.join(' '), correction: Math.random() < 0.5 ? '*' + mot : null };
 }
 
+// Un joueur qui tape vite ne met pas de majuscule au debut ni de point a la fin.
+function ecrireCommeJoueur(texte) {
+  return (texte.charAt(0).toLowerCase() + texte.slice(1)).replace(/\.$/, '');
+}
+
 // Temps de reaction humain : environ 250 ms (plus ou moins 40 ms).
 function reactionMs() {
   return Math.max(150, gauss(250, 40));
@@ -71,4 +76,4 @@ function delaiEntreCoups() {
   return Math.max(300, gauss(650, 150));
 }
 
-module.exports = { STYLE_DEFAUT, uniform, gauss, messageDelayMs, fauteDeFrappe, reactionMs, delaiAvantAction, frapper, delaiEntreCoups };
+module.exports = { STYLE_DEFAUT, uniform, gauss, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, reactionMs, delaiAvantAction, frapper, delaiEntreCoups };
