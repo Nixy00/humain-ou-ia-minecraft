@@ -14,11 +14,11 @@
   "dependencies": {
     "dotenv": "^16.6.1",
     "minecraft-data": "^3.117.0",
-    "mineflayer": "^4.25.0",
+    "mineflayer": "^4.39.0",
     "mineflayer-pathfinder": "^2.4.5",
     "vec3": "^0.2.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }

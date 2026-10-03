@@ -14,21 +14,6 @@ const { callTool } = require('../llm/structured');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// mineflayer 4.25 lit velocityX/Y/Z alors que minecraft-data 3.117 envoie un champ "velocity".
-// Sans ça la vitesse vaut NaN quand le bot se fait taper, et le serveur l'expulse
-// ("Invalid move player packet"). On recopie les valeurs (le recul reste normal).
-// A supprimer quand on passera a mineflayer >= 4.34 (qui demande Node 22).
-function corrigerPaquetsVitesse(client) {
-  for (const nom of ['entity_velocity', 'spawn_entity']) {
-    client.prependListener(nom, (p) => {
-      if (p.velocity) {
-        p.velocityX = p.velocity.x;
-        p.velocityY = p.velocity.y;
-        p.velocityZ = p.velocity.z;
-      }
-    });
-  }
-}
 
 class Agent {
   constructor({ username, persona, style }, { cfg, gateway, logger }) {
@@ -60,7 +45,6 @@ class Agent {
       auth: this.cfg.mc.auth,
     });
     this.bot = bot;
-    corrigerPaquetsVitesse(bot._client);
     bot.loadPlugin(pathfinder);
 
     bot.once('spawn', () => {
@@ -329,4 +313,4 @@ class Agent {
   }
 }
 
-module.exports = { Agent, corrigerPaquetsVitesse };
+module.exports = { Agent };

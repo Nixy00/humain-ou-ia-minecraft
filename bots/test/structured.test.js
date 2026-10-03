@@ -131,16 +131,6 @@ test('accents : enlevés au hasard selon la probabilité de les garder', () => {
   assert.strictEqual(enleverAccents('bien joué sérieux', 1), 'bien joué sérieux');
 });
 
-test('paquet de recul : la vitesse est recopiée sous les anciens noms (sinon NaN et expulsion)', () => {
-  const { EventEmitter } = require('events');
-  const { corrigerPaquetsVitesse } = require('../src/agent/agent');
-  const client = new EventEmitter();
-  corrigerPaquetsVitesse(client);
-  let lu;
-  client.on('entity_velocity', (p) => { lu = [p.velocityX, p.velocityY, p.velocityZ]; });
-  client.emit('entity_velocity', { entityId: 1, velocity: { x: 100, y: 200, z: -50 } });
-  assert.deepStrictEqual(lu, [100, 200, -50]);
-});
 
 test('collecter de la cobble = miner de la pierre', () => {
   const { resolveBlocks } = require('../src/agent/actions');
