@@ -83,6 +83,8 @@ const BLOC_QUI_DONNE = { cobblestone: 'stone', cobbled_deepslate: 'deepslate', f
 
 function resolveBlocks(mcData, name) {
   name = BLOC_QUI_DONNE[name] || name;
+  // Une bûche demandée (oak_log...) accepte toutes les essences : autour du spawn il ne reste parfois que du bouleau.
+  if (name.endsWith('_log')) return mcData.blocksArray.filter((b) => b.name.endsWith('_log') && !b.name.startsWith('stripped')).map((b) => b.id);
   const exact = mcData.blocksByName[name];
   if (exact) return [exact.id];
   return mcData.blocksArray.filter((b) => b.name.includes(name)).map((b) => b.id);
@@ -191,14 +193,23 @@ const executors = {
     }
     if (!recipe) {
       // On dit au modèle ce qui manque vraiment (avant : "il faut un établi" alors qu'il manquait des planches).
-      const modele = bot.recipesAll(item.id, null, true)[0];
-      if (!modele) throw new Error(`${objet} ne se fabrique pas`);
-      const manque = modele.delta.filter((d) => d.count < 0).map((d) => `${-d.count} ${mcData.items[d.id].name}`);
-      const besoinTable = modele.requiresTable && !table ? ', et une table de craft posée à côté' : '';
-      throw new Error(`il te faut : ${manque.join(', ')}${besoinTable}`);
+      // Une recette a parfois plusieurs variantes (planches de chêne, d'épicéa...) : on garde celle
+      // à laquelle il manque le moins de choses, et on ne liste que ce qui manque.
+      const manquePour = (r) => r.delta
+        .filter((d) => d.count < 0 && countItem(bot, mcData.items[d.id].name) < -d.count)
+        .map((d) => `${-d.count - countItem(bot, mcData.items[d.id].name)} ${mcData.items[d.id].name}`);
+      const variantes = bot.recipesAll(item.id, null, true);
+      if (variantes.length === 0) throw new Error(`${objet} ne se fabrique pas`);
+      const modele = variantes.reduce((a, b) => (manquePour(b).length < manquePour(a).length ? b : a));
+      const manque = manquePour(modele);
+      if (modele.requiresTable && !table) manque.push('une table de craft posée à côté (poser_bloc crafting_table)');
+      throw new Error(`il te manque : ${manque.join(', ')}`);
     }
+    // On fabrique autant que possible avec ce qu'on a (sinon "missing ingredient" si on en demande trop).
+    const possible = Math.min(...recipe.delta.filter((d) => d.count < 0).map((d) => Math.floor(countItem(bot, mcData.items[d.id].name) / -d.count)));
     const before = countItem(bot, objet);
-    await bot.craft(recipe, quantite, table);
+    await bot.craft(recipe, Math.min(quantite, possible), table);
+    await sleep(500); // le temps que le serveur mette l'inventaire à jour
     return `${countItem(bot, objet) - before} ${objet} fabriqué(s)`;
   },
 
