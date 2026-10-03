@@ -1,5 +1,5 @@
 // Enregistre la partie dans des fichiers .jsonl (une ligne JSON par evenement).
-// Un fichier par type : llm_calls, decisions, actions, events, votes, errors.
+// Un fichier par type : llm_calls, decisions, actions, events, votes, notes, errors.
 
 const fs = require('fs');
 const path = require('path');

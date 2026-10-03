@@ -39,7 +39,7 @@ class Agent {
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], chat: [], actions: [], objectif: null };
+    this.memory = { events: [], chat: [], actions: [], notes: [], objectif: null };
     this.seq = 0;
     this.busy = false;
     this.pendingReason = null;
@@ -179,8 +179,15 @@ class Agent {
         this.logger.write('decisions', { agent: this.username, decision_id: decisionId, reason, ok: false, llm_ms: llmMs });
         return;
       }
-      const { objectif, ...args } = choice.args;
+      const { objectif, note, ...args } = choice.args;
       if (objectif) this.memory.objectif = objectif;
+      // Carnet de notes : l'IA garde ce qu'elle veut retenir (10 dernières notes),
+      // et tout est enregistré dans notes.jsonl pour l'analyse.
+      if (note) {
+        this.memory.notes.push({ text: note, t: Date.now() });
+        if (this.memory.notes.length > 10) this.memory.notes.shift();
+        this.logger.write('notes', { agent: this.username, decision_id: decisionId, note });
+      }
       this.logger.write('decisions', {
         agent: this.username, decision_id: decisionId, reason, ok: true,
         tool: choice.name, args, objectif: objectif ?? null, llm_call_ids: choice.callIds, llm_ms: llmMs,

@@ -66,6 +66,10 @@ function observe(bot, mcData, memory) {
     `Blocs utiles autour : ${nearbyBlocks(bot, mcData)}.`,
   ];
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
+  if (memory.notes.length > 0) {
+    lines.push('', 'Ton carnet (ce que tu as noté pour t\'en souvenir) :');
+    for (const n of memory.notes) lines.push(`- [${agoText(n.t)}] ${n.text}`);
+  }
 
   // Le chat est affiché comme une vraie conversation : les messages des autres et les tiens, dans l'ordre.
   lines.push('', 'Conversation dans le chat (du plus ancien au plus récent, <toi> = tes messages) :');

@@ -193,7 +193,9 @@ test('fil de conversation : messages reçus et envoyés dans l\'ordre, sans les 
   a.onEvent({ type: 'reflexe', text: 'auto_defense : spider' }, null);
   const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
     inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 0 } };
+  a.memory.notes.push({ text: 'SAHYGO veut 5 cobble', t: Date.now() });
   const texte = observe(bot, { blocksArray: [] }, a.memory);
+  assert.ok(texte.includes('SAHYGO veut 5 cobble'));
   assert.ok(texte.indexOf('<SAHYGO> viens') < texte.indexOf('<toi> jarrive'));
   assert.ok(texte.split('Autres évènements')[1].includes('auto_defense'));
   assert.ok(!texte.split('Autres évènements')[0].includes('auto_defense'));

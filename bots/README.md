@@ -67,7 +67,7 @@ Tout le comportement "humain" se coupe avec `AGENT_HUMANIZE=false` pour comparer
 
 ## Données produites (`data/parties/<GAME_ID>/`)
 
-`llm_calls.jsonl`, `decisions.jsonl`, `actions.jsonl`, `events.jsonl`, `votes.jsonl`, `errors.jsonl`.
+`llm_calls.jsonl`, `decisions.jsonl`, `actions.jsonl`, `events.jsonl`, `votes.jsonl`, `notes.jsonl` (carnet de l'IA), `errors.jsonl`.
 Le champ `decision_id` relie une action ou un message du jeu aux appels LLM qui l'ont produit
 (`llm_call_ids`). Les métadonnées envoyées à LiteLLM (`session_id` = partie, `trace_id` = décision)
 permettent de retrouver les mêmes appels dans Langfuse si la passerelle y est reliée.

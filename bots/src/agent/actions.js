@@ -13,6 +13,7 @@ const { frapper, delaiEntreCoups } = require('./humanizer');
 
 // Champ commun : le modèle peut noter son objectif courant, réaffiché au tour suivant.
 const OBJECTIF = { type: 'string', maxLength: 120, description: 'Ton objectif actuel en quelques mots (optionnel).' };
+const NOTE = { type: 'string', maxLength: 120, description: "Une chose à retenir pour plus tard, ex. 'SAHYGO m'a demandé 5 cobble' (optionnel)." };
 const JOUEUR = { type: 'string', maxLength: 32, description: 'Pseudo exact du joueur.' };
 const ID_MC = { type: 'string', maxLength: 64, description: 'Identifiant Minecraft en anglais, ex. oak_log, cobblestone, stick.' };
 const COORD = { type: 'integer', description: 'Coordonnée (nombre entier).' };
@@ -21,7 +22,7 @@ function tool(name, description, properties, required = []) {
   return {
     name,
     description,
-    parameters: { type: 'object', properties: { ...properties, objectif: OBJECTIF }, required },
+    parameters: { type: 'object', properties: { ...properties, objectif: OBJECTIF, note: NOTE }, required },
   };
 }
 
