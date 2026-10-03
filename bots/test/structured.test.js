@@ -154,3 +154,8 @@ test('répétition : un message qui commence comme un des derniers est refusé',
   assert.strictEqual(a.verifierRepetition('parler', { message: "mdr t'es ou gros ? je te vois pas" }).length, 1);
   assert.strictEqual(a.verifierRepetition('parler', { message: 'jvais couper du bois' }).length, 0);
 });
+
+test('écrire comme un joueur : pas de majuscule au début, pas de point final, apostrophe clavier', () => {
+  const { ecrireCommeJoueur } = require('../src/agent/humanizer');
+  assert.strictEqual(ecrireCommeJoueur('Mdr t’es où.'), "mdr t'es où");
+});

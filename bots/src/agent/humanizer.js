@@ -51,7 +51,8 @@ function fauteDeFrappe(texte, chance) {
 
 // Un joueur qui tape vite ne met pas de majuscule au debut ni de point a la fin.
 function ecrireCommeJoueur(texte) {
-  return (texte.charAt(0).toLowerCase() + texte.slice(1)).replace(/\.$/, '');
+  // Le modèle écrit parfois l'apostrophe typographique ’ : au clavier on tape '.
+  return (texte.charAt(0).toLowerCase() + texte.slice(1)).replace(/\.$/, '').replace(/’/g, "'");
 }
 
 // Dans un chat on met rarement les accents : chaque mot accentue garde ses accents
