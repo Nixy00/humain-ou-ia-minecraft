@@ -127,12 +127,20 @@ class Agent {
   // Regroupe les évènements rapprochés : une seule décision après `delayMs` de calme.
   schedule(reason, delayMs) {
     if (!this.mcData) return;
+    // Une demande d'un joueur ne doit jamais être remplacée par la minuterie
+    // (sinon le bot oublie que quelqu'un lui a parlé).
+    const enAttente = this.busy ? this.pendingReason : this.raisonPrevue;
+    if (reason.startsWith('minuterie') && enAttente && !enAttente.startsWith('minuterie')) return;
     if (this.busy) {
       this.pendingReason = reason;
       return;
     }
     clearTimeout(this.decideTimer);
-    this.decideTimer = setTimeout(() => this.decide(reason), delayMs);
+    this.raisonPrevue = reason;
+    this.decideTimer = setTimeout(() => {
+      this.raisonPrevue = null;
+      this.decide(reason);
+    }, delayMs);
   }
 
   async decide(reason) {
@@ -282,6 +290,7 @@ class Agent {
     clearInterval(this.tickTimer);
     clearInterval(this.reflexTimer);
     clearTimeout(this.decideTimer);
+    this.raisonPrevue = null;
     this.mcData = null;
     this.busy = false;
     this.logger.write('events', { agent: this.username, type: 'deconnexion', text: String(reason) });

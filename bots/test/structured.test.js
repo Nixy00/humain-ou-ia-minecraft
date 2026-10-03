@@ -167,3 +167,18 @@ test('répétition : "wsh tes ou frr" puis "wsh tes ou jte vois pas" est refusé
   a.memory.actions.push({ name: 'parler', args: { message: "wsh t'es ou frr ?" } });
   assert.strictEqual(a.verifierRepetition('parler', { message: "wsh t'es ou jte vois pas mdr" }).length, 1);
 });
+
+test('une demande de joueur n\'est pas écrasée par la minuterie', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  a.mcData = {};
+  a.busy = true; // le bot est occupé par une action
+  a.schedule('message de SAHYGO', 0);
+  a.schedule('minuterie (rien ne s\'est passé récemment)', 0);
+  assert.strictEqual(a.pendingReason, 'message de SAHYGO');
+  a.busy = false; // pas occupé : la décision est prévue dans 1,5 s
+  a.schedule('message de SAHYGO', 1500);
+  a.schedule('minuterie (rien ne s\'est passé récemment)', 0);
+  assert.strictEqual(a.raisonPrevue, 'message de SAHYGO');
+  clearTimeout(a.decideTimer);
+});
