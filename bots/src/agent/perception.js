@@ -66,6 +66,11 @@ function observe(bot, mcData, memory) {
     `Blocs utiles autour : ${nearbyBlocks(bot, mcData)}.`,
   ];
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
+  const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
+  if (demandes.length > 0) {
+    lines.push('', "Ce qu'on t'a demandé récemment (fais-le, ou dis simplement que tu ne peux pas) :");
+    for (const d of demandes) lines.push(`- [${agoText(d.t)}] <${d.from}> ${d.text}`);
+  }
   if (memory.notes.length > 0) {
     lines.push('', 'Ton carnet (ce que tu as noté pour t\'en souvenir) :');
     for (const n of memory.notes) lines.push(`- [${agoText(n.t)}] ${n.text}`);

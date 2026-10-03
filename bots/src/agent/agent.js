@@ -24,7 +24,7 @@ class Agent {
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], chat: [], actions: [], notes: [], objectif: null };
+    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null };
     this.seq = 0;
     this.busy = false;
     this.pendingReason = null;
@@ -73,6 +73,11 @@ class Agent {
       if (pourMoi && this.actionEnCours) {
         bot.interrompre = true;
         bot.pathfinder.setGoal(null);
+      }
+      // Ce qu'on lui demande reste affiché à part (le modèle n'utilisait jamais son carnet tout seul).
+      if (pourMoi) {
+        this.memory.demandes.push({ from, text, t: Date.now() });
+        if (this.memory.demandes.length > 3) this.memory.demandes.shift();
       }
       this.onEvent({ type: 'chat', from, text }, reagir ? `message de ${from}` : null);
     });
