@@ -140,3 +140,9 @@ test('paquet de recul : la vitesse est recopiée sous les anciens noms (sinon Na
   client.emit('entity_velocity', { entityId: 1, velocity: { x: 100, y: 200, z: -50 } });
   assert.deepStrictEqual(lu, [100, 200, -50]);
 });
+
+test('collecter de la cobble = miner de la pierre', () => {
+  const { resolveBlocks } = require('../src/agent/actions');
+  const mcData = require('minecraft-data')('1.20.4');
+  assert.deepStrictEqual(resolveBlocks(mcData, 'cobblestone'), [mcData.blocksByName.stone.id]);
+});

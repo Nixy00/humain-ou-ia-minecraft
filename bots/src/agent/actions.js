@@ -72,7 +72,11 @@ function checkArgs(bot, name, args) {
 }
 
 // Résout "oak_log" exactement, sinon "log" -> tous les blocs dont le nom contient "log".
+// Certains objets ne se trouvent pas tels quels : on mine le bloc qui les donne.
+const BLOC_QUI_DONNE = { cobblestone: 'stone', cobbled_deepslate: 'deepslate', flint: 'gravel' };
+
 function resolveBlocks(mcData, name) {
+  name = BLOC_QUI_DONNE[name] || name;
   const exact = mcData.blocksByName[name];
   if (exact) return [exact.id];
   return mcData.blocksArray.filter((b) => b.name.includes(name)).map((b) => b.id);
@@ -401,4 +405,4 @@ async function execute(bot, name, args, ctx, timeoutMs) {
   }
 }
 
-module.exports = { TOOLS, executors, execute, checkArgs };
+module.exports = { TOOLS, executors, execute, checkArgs, resolveBlocks };
