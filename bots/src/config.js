@@ -57,7 +57,7 @@ module.exports = {
     voteCommand: env('VOTE_COMMAND', '/designer {joueur} {nature}'),
   },
   agent: {
-    tickMs: envInt('AGENT_TICK_MS', 20000),
+    tickMs: envInt('AGENT_TICK_MS', 30000),
     chatDebounceMs: envInt('AGENT_CHAT_DEBOUNCE_MS', 1500),
     actionTimeoutMs: envInt('AGENT_ACTION_TIMEOUT_MS', 60000),
     maxEvents: envInt('AGENT_MAX_EVENTS', 15),
