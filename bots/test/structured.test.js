@@ -89,6 +89,7 @@ test('checkArgs refuse les commandes serveur dans les messages', () => {
   const bot = { username: 'Joueur4', players: { Joueur1: {} } };
   assert.strictEqual(checkArgs(bot, 'parler', { message: ' /designer Joueur1 ia' }).length, 1);
   assert.strictEqual(checkArgs(bot, 'murmurer', { joueur: 'Joueur1', message: 'salut' }).length, 0);
+  assert.strictEqual(checkArgs(bot, 'parler', { message: 'jai 3 oak_log' }).length, 1);
 });
 
 test("chaque outil proposé au LLM a une fonction qui l'exécute", () => {

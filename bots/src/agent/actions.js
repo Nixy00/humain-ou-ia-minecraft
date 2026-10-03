@@ -61,6 +61,10 @@ function checkArgs(bot, name, args) {
   // bot.chat exécute tout texte commençant par "/" comme une commande serveur (ex. /designer) :
   // le modèle, ou un joueur qui le manipule par le chat, pourrait voter ou agir hors des outils.
   if (typeof args.message === 'string' && args.message.trimStart().startsWith('/')) errors.push('un message ne peut pas commencer par "/"');
+  // Un joueur n'écrit pas "oak_log" dans le chat : on refuse et le modèle reformule.
+  if (typeof args.message === 'string' && /[a-z]+_[a-z]+/i.test(args.message)) {
+    errors.push('écris comme un joueur, sans identifiant avec "_" (ex. oak_log -> bois)');
+  }
   if ('x' in args && bot.entity && bot.entity.position.distanceTo(new Vec3(args.x, args.y, args.z)) > 64) {
     errors.push('ces coordonnées sont trop loin de toi (plus de 64 blocs)');
   }
