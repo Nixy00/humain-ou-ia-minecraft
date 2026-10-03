@@ -209,3 +209,12 @@ test('réflexes : pas de plantage quand le bloc au-dessus de la tête est null (
   clearInterval(timer);
   assert.deepStrictEqual(erreurs, []);
 });
+
+test('attendre s\'arrête dès qu\'un joueur parle au bot', async () => {
+  const { executors } = require('../src/agent/actions');
+  const bot = { interrompre: false };
+  setTimeout(() => { bot.interrompre = true; }, 300);
+  const t = Date.now();
+  await executors.attendre(bot, { secondes: 10 });
+  assert.ok(Date.now() - t < 2000);
+});

@@ -141,7 +141,7 @@ const executors = {
     const inatteignables = new Set();
     const fin = Date.now() + 45000; // on rend la main avant la limite de 60 s d'une action
     try {
-      while (mined < quantite && rates < 3 && Date.now() < fin) {
+      while (mined < quantite && rates < 3 && Date.now() < fin && !bot.interrompre) {
         const positions = bot.findBlocks({ matching: ids, maxDistance: 32, count: 10 });
         const pos = positions.find((p) => !inatteignables.has(p.toString()));
         if (!pos) break;
@@ -259,7 +259,7 @@ const executors = {
   },
 
   async attendre(bot, { secondes }) {
-    await sleep(secondes * 1000);
+    await patienter(bot, secondes * 1000);
     return `attendu ${secondes} s`;
   },
 
@@ -270,7 +270,7 @@ const executors = {
 
   async suivre_joueur(bot, { joueur, secondes }) {
     bot.pathfinder.setGoal(new goals.GoalFollow(playerEntity(bot, joueur), 3), true);
-    await sleep(secondes * 1000);
+    await patienter(bot, secondes * 1000);
     bot.pathfinder.setGoal(null);
     return `${joueur} suivi pendant ${secondes} s`;
   },
@@ -453,6 +453,12 @@ async function allerAvecLimite(bot, goal, ms) {
   }
 }
 
+// Attendre, mais s'arrêter tout de suite si un joueur lui parle (bot.interrompre, mis par agent.js).
+async function patienter(bot, ms) {
+  const fin = Date.now() + ms;
+  while (Date.now() < fin && !bot.interrompre) await sleep(250);
+}
+
 function findItem(bot, name) {
   const item = bot.inventory.items().find((i) => i.name === name);
   if (!item) throw new Error(`tu n'as pas de ${name}`);
@@ -472,6 +478,7 @@ async function execute(bot, name, args, ctx, timeoutMs) {
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(`action interrompue après ${timeoutMs / 1000} s`)), timeoutMs);
   });
+  bot.interrompre = false; // remis à vrai par agent.js si un joueur lui parle pendant l'action
   try {
     // On peut parler ou attendre dans son lit, mais pour le reste il faut se lever.
     if (bot.isSleeping && !['dormir', 'parler', 'murmurer', 'attendre'].includes(name)) await bot.wake();

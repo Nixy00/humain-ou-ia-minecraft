@@ -64,9 +64,16 @@ class Agent {
 
     bot.on('chat', (from, text) => {
       if (from === this.username) return;
-      // Un joueur ne réagit pas à tout : toujours si on lui parle, sinon selon son caractère (style.bavard).
-      const pourMoi = text.toLowerCase().includes(this.username.toLowerCase());
+      // Un joueur ne réagit pas à tout : toujours si on lui parle (ou s'ils ne sont que deux sur le serveur),
+      // sinon selon son caractère (style.bavard).
+      const seulsTousLesDeux = Object.keys(bot.players).length <= 2;
+      const pourMoi = seulsTousLesDeux || text.toLowerCase().includes(this.username.toLowerCase());
       const reagir = pourMoi || !this.cfg.agent.humanize || Math.random() < this.style.bavard;
+      // Quelqu'un lui parle : comme un joueur, il s'arrête dans ce qu'il fait pour répondre.
+      if (pourMoi && this.actionEnCours) {
+        bot.interrompre = true;
+        bot.pathfinder.setGoal(null);
+      }
       this.onEvent({ type: 'chat', from, text }, reagir ? `message de ${from}` : null);
     });
     bot.on('whisper', (from, text) => {
