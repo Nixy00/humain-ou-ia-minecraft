@@ -393,7 +393,7 @@ async function execute(bot, name, args, ctx, timeoutMs) {
     const result = await Promise.race([executors[name](bot, args, ctx), timeout]);
     return { ok: true, result };
   } catch (err) {
-    bot.pathfinder.stop();
+    bot.pathfinder.setGoal(null);
     bot.clearControlStates();
     return { ok: false, result: err.message };
   } finally {

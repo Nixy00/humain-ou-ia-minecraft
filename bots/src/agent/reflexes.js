@@ -47,7 +47,7 @@ function startReflexes(bot, style, actionEnCours, onReflexe) {
         anciennePos = pos.clone();
         immobileDepuis = maintenant;
       } else if (maintenant - immobileDepuis > 10000) {
-        bot.pathfinder.stop();
+        bot.pathfinder.setGoal(null);
         onReflexe('debloquer', `bloque en ${Math.round(pos.x)} ${Math.round(pos.y)} ${Math.round(pos.z)}`);
         immobileDepuis = maintenant;
       }
