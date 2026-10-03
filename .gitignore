@@ -33,3 +33,6 @@ server/rcon
 server/rcon-*
 # --- Journaux de parties (données pseudonymisées, hors dépôt) ---
 data/parties/
+
+# --- Python ---
+__pycache__/
