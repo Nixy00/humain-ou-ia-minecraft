@@ -69,6 +69,7 @@ class Agent {
       const moves = new Movements(bot);
       moves.canDig = false; // on ne casse pas de blocs pour se déplacer (constructions des autres)
       bot.pathfinder.setMovements(moves);
+      bot.pathfinder.thinkTimeout = 10000; // 5 s par défaut : trop court pour les blocs dans les grottes ("Took to long to decide path")
       this.log('connecté');
       this.logger.write('events', { agent: this.username, type: 'connexion' });
       this.tickTimer = setInterval(() => this.schedule('minuterie (rien ne s\'est passé récemment)', 0), this.cfg.agent.tickMs);

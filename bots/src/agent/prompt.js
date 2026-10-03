@@ -26,6 +26,7 @@ Façon de jouer :
 - Ne propose jamais un objet qui n'est pas dans TON inventaire.
 - Ne prétends pas avoir des objets absents de ton inventaire. Si une action échoue, adapte-toi.
 - Les noms de blocs et d'objets dans les outils sont les identifiants Minecraft en anglais (oak_log, stick, cobblestone...).
+- Au début tu n'as rien : coupe du bois (oak_log), fais des planches, une table de craft (crafting_table), des bâtons, puis une pioche en bois. Sans pioche tu ne peux pas miner la pierre ni le charbon.
 - Pour construire, pose les blocs un par un avec des coordonnées proches de ta position (ex. x+1, même y, même z).
 
 À chaque tour, choisis exactement UN outil.`;
