@@ -62,6 +62,8 @@ module.exports = {
     actionTimeoutMs: envInt('AGENT_ACTION_TIMEOUT_MS', 60000),
     maxEvents: envInt('AGENT_MAX_EVENTS', 15),
     humanize: envBool('AGENT_HUMANIZE', true),
+    // true pour les parties de test entre IA : elles jouent même sans humain connecté.
+    sansHumain: envBool('AGENT_SANS_HUMAIN', false),
     joinDelayMaxMs: envInt('AGENT_JOIN_DELAY_MAX_MS', 20000),
   },
 };

@@ -218,3 +218,23 @@ test('attendre s\'arrête dès qu\'un joueur parle au bot', async () => {
   await executors.attendre(bot, { secondes: 10 });
   assert.ok(Date.now() - t < 2000);
 });
+
+test("demandes : ce qu'un joueur demande au bot reste affiché", () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const memory = { events: [], chat: [], actions: [], notes: [], demandes: [{ from: 'SAHYGO', text: 'va chercher 5 bûches', t: Date.now() }], objectif: null };
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 0 } };
+  const texte = observe(bot, { blocksArray: [] }, memory);
+  assert.ok(texte.includes("Ce qu'on t'a demandé"));
+  assert.ok(texte.includes('<SAHYGO> va chercher 5 bûches'));
+});
+
+test('humain connecté : les autres agents ne comptent pas', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: { game: { agents: ['Joueur4', 'Joueur5'] } }, gateway: {}, logger: {} });
+  a.bot = { players: { Joueur4: {}, Joueur5: {} } };
+  assert.strictEqual(a.humainConnecte(), false);
+  a.bot.players.SAHYGO = {};
+  assert.strictEqual(a.humainConnecte(), true);
+});

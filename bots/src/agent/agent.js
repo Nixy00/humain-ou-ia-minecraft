@@ -56,7 +56,11 @@ class Agent {
       bot.pathfinder.thinkTimeout = 10000; // 5 s par défaut : trop court pour les blocs dans les grottes ("Took to long to decide path")
       this.log('connecté');
       this.logger.write('events', { agent: this.username, type: 'connexion' });
-      this.tickTimer = setInterval(() => this.schedule('minuterie (rien ne s\'est passé récemment)', 0), this.cfg.agent.tickMs);
+      this.tickTimer = setInterval(() => {
+        // Aucun humain connecté : on ne dépense pas de tokens pour rien (sauf parties de test entre IA).
+        if (!this.cfg.agent.sansHumain && !this.humainConnecte()) return;
+        this.schedule('minuterie (rien ne s\'est passé récemment)', 0);
+      }, this.cfg.agent.tickMs);
       // Les réflexes sont journalisés et ajoutés aux évènements vus par le LLM (sans déclencher de décision).
       this.reflexTimer = startReflexes(bot, this.style, () => this.actionEnCours, (type, detail) => this.onEvent({ type: 'reflexe', text: `${type} : ${detail}` }, null));
       this.schedule('tu viens de te connecter', uniform(3000, 8000));
@@ -119,6 +123,10 @@ class Agent {
     }
     this.logger.write('events', { agent: this.username, ...event });
     if (reason) this.schedule(reason, this.cfg.agent.chatDebounceMs);
+  }
+
+  humainConnecte() {
+    return Object.keys(this.bot.players).some((nom) => !this.cfg.game.agents.includes(nom));
   }
 
   // Un joueur ne renvoie pas trois fois le même message : on refuse un message
