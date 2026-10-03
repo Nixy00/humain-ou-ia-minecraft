@@ -6,7 +6,7 @@
 // de Mindcraft : Copyright (c) 2024 Kolby Nottingham, licence MIT,
 // https://github.com/mindcraft-bots/mindcraft
 
-const { goals } = require('mineflayer-pathfinder');
+const { goals, Movements } = require('mineflayer-pathfinder');
 const { Vec3 } = require('vec3');
 const { isHostile } = require('./perception');
 const { frapper, delaiEntreCoups } = require('./humanizer');
@@ -118,26 +118,63 @@ const executors = {
   async collecter(bot, { bloc, quantite }, { mcData }) {
     const ids = resolveBlocks(mcData, bloc);
     if (ids.length === 0) throw new Error(`bloc inconnu : ${bloc}`);
-    let mined = 0;
-    for (let i = 0; i < quantite; i++) {
-      const target = bot.findBlock({ matching: ids, maxDistance: 32 });
-      if (!target) break;
-      await bot.pathfinder.goto(new goals.GoalLookAtBlock(target.position, bot.world));
-      const toolItem = bot.pathfinder.bestHarvestTool(target);
-      if (toolItem) await bot.equip(toolItem, 'hand');
-      if (!target.canHarvest(bot.heldItem ? bot.heldItem.type : null)) {
-        throw new Error(`il faut un meilleur outil pour ${target.name}`);
-      }
-      await bot.dig(target);
-      mined++;
-      // Aller sur l'emplacement pour ramasser l'objet tombé.
-      try {
-        await bot.pathfinder.goto(new goals.GoalNear(target.position.x, target.position.y, target.position.z, 1));
-      } catch { /* objet hors d'atteinte : tant pis */ }
-      await sleep(300);
+    // Sans pioche, la pierre et les minerais ne donnent rien : on le dit tout de suite au modèle.
+    const outils = mcData.blocks[ids[0]].harvestTools;
+    if (outils && !bot.inventory.items().some((i) => outils[i.type])) {
+      throw new Error(`il te faut une pioche pour ${bloc} : coupe du bois, fais des planches, une table de craft puis une pioche en bois`);
     }
-    if (mined === 0) throw new Error(`aucun ${bloc} trouvé à moins de 32 blocs`);
-    return `${mined} bloc(s) récolté(s)`;
+
+    // Pendant la récolte on a le droit de creuser (sinon les blocs dans la roche sont inatteignables),
+    // et on abandonne vite un bloc inatteignable pour essayer le suivant.
+    const avant = { movements: bot.pathfinder.movements, timeout: bot.pathfinder.thinkTimeout };
+    const moves = new Movements(bot);
+    moves.canDig = true;
+    bot.pathfinder.setMovements(moves);
+    bot.pathfinder.thinkTimeout = 3000;
+
+    const nbObjets = () => bot.inventory.items().reduce((s, i) => s + i.count, 0);
+    const objetsAvant = nbObjets();
+    let mined = 0;
+    let rates = 0;
+    const inatteignables = new Set();
+    const fin = Date.now() + 45000; // on rend la main avant la limite de 60 s d'une action
+    try {
+      while (mined < quantite && rates < 3 && Date.now() < fin) {
+        const positions = bot.findBlocks({ matching: ids, maxDistance: 32, count: 10 });
+        const pos = positions.find((p) => !inatteignables.has(p.toString()));
+        if (!pos) break;
+        const target = bot.blockAt(pos);
+        try {
+          await allerAvecLimite(bot, new goals.GoalLookAtBlock(target.position, bot.world), 15000);
+        } catch {
+          inatteignables.add(pos.toString());
+          rates++;
+          continue;
+        }
+        const toolItem = bot.pathfinder.bestHarvestTool(target);
+        if (toolItem) await bot.equip(toolItem, 'hand');
+        await bot.dig(target);
+        mined++;
+        // Aller ramasser l'objet tombé, là où il a atterri (il peut rouler ou tomber plus bas).
+        await sleep(400);
+        const objet = bot.nearestEntity((e) => e.name === 'item' && e.position.distanceTo(target.position) < 6);
+        if (objet) {
+          const p = objet.position;
+          try {
+            await allerAvecLimite(bot, new goals.GoalNear(p.x, p.y, p.z, 0.5), 5000);
+          } catch { /* objet hors d'atteinte : tant pis */ }
+          await sleep(300);
+        }
+      }
+    } finally {
+      bot.pathfinder.setMovements(avant.movements);
+      bot.pathfinder.thinkTimeout = avant.timeout;
+    }
+    if (mined === 0) throw new Error(`aucun ${bloc} atteignable à moins de 32 blocs, essaie d'explorer`);
+    // On annonce ce qui est vraiment entré dans l'inventaire, pas seulement les blocs cassés.
+    const gagnes = nbObjets() - objetsAvant;
+    if (gagnes === 0) throw new Error(`${mined} bloc(s) cassé(s) mais rien ramassé`);
+    return `${gagnes} objet(s) ramassé(s) en cassant ${mined} ${bloc}${mined < quantite ? ' (pas plus pour le moment)' : ''}`;
   },
 
   async fabriquer(bot, { objet, quantite }, { mcData }) {
@@ -147,11 +184,19 @@ const executors = {
     let recipe = bot.recipesFor(item.id, null, 1, null)[0];
     if (!recipe) {
       table = bot.findBlock({ matching: mcData.blocksByName.crafting_table.id, maxDistance: 32 });
-      if (!table) throw new Error("pas de recette possible sans établi, et aucun établi à proximité");
-      await bot.pathfinder.goto(new goals.GoalLookAtBlock(table.position, bot.world));
-      recipe = bot.recipesFor(item.id, null, 1, table)[0];
+      if (table) {
+        await bot.pathfinder.goto(new goals.GoalLookAtBlock(table.position, bot.world));
+        recipe = bot.recipesFor(item.id, null, 1, table)[0];
+      }
     }
-    if (!recipe) throw new Error(`ressources insuffisantes pour ${objet}`);
+    if (!recipe) {
+      // On dit au modèle ce qui manque vraiment (avant : "il faut un établi" alors qu'il manquait des planches).
+      const modele = bot.recipesAll(item.id, null, true)[0];
+      if (!modele) throw new Error(`${objet} ne se fabrique pas`);
+      const manque = modele.delta.filter((d) => d.count < 0).map((d) => `${-d.count} ${mcData.items[d.id].name}`);
+      const besoinTable = modele.requiresTable && !table ? ', et une table de craft posée à côté' : '';
+      throw new Error(`il te faut : ${manque.join(', ')}${besoinTable}`);
+    }
     const before = countItem(bot, objet);
     await bot.craft(recipe, quantite, table);
     return `${countItem(bot, objet) - before} ${objet} fabriqué(s)`;
@@ -377,6 +422,25 @@ const executors = {
 const BLOCS_VIDES = ['air', 'cave_air', 'water', 'lava', 'grass', 'short_grass', 'tall_grass', 'snow', 'fern', 'dead_bush'];
 const DIRECTIONS = [new Vec3(0, -1, 0), new Vec3(0, 1, 0), new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)];
 const COMBUSTIBLES = ['coal', 'charcoal', '_planks', '_log'];
+
+// Le pathfinder peut tourner en rond sans fin vers un point en l'air (ex. une bûche en haut d'un arbre) :
+// on arrête le déplacement au bout de ms millisecondes.
+async function allerAvecLimite(bot, goal, ms) {
+  let timer;
+  try {
+    await Promise.race([
+      bot.pathfinder.goto(goal),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          bot.pathfinder.setGoal(null);
+          reject(new Error('trop long'));
+        }, ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function findItem(bot, name) {
   const item = bot.inventory.items().find((i) => i.name === name);
