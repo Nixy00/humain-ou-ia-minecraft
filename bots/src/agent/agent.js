@@ -106,6 +106,7 @@ class Agent {
   async decide(reason) {
     if (this.busy || this.stopping || !this.bot?.entity) return;
     this.busy = true;
+    const bot = this.bot;
     const decisionId = `${this.username}-${++this.seq}`;
     const t0 = Date.now();
     try {
@@ -140,8 +141,13 @@ class Agent {
         delay = messageDelayMs(args.message, llmMs, this.cfg.agent);
         await sleep(delay);
       }
+      // Si le bot s'est déconnecté pendant l'attente, on abandonne l'action.
+      if (this.bot !== bot || !bot.entity) {
+        this.logger.write('errors', { agent: this.username, decision_id: decisionId, message: 'action annulée : bot déconnecté pendant la décision' });
+        return;
+      }
       const tAction = Date.now();
-      const res = await execute(this.bot, choice.name, args, { mcData: this.mcData }, this.cfg.agent.actionTimeoutMs);
+      const res = await execute(this.bot,choice.name, args, { mcData: this.mcData }, this.cfg.agent.actionTimeoutMs);
       this.logger.write('actions', {
         agent: this.username, decision_id: decisionId, tool: choice.name, args,
         ok: res.ok, result: res.result, humanize_delay_ms: Math.round(delay), duration_ms: Date.now() - tAction,
