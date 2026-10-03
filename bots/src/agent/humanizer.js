@@ -18,6 +18,7 @@ const STYLE_DEFAUT = {
   bavard: 0.5, // chance de reagir a un message qui ne lui est pas adresse
   fautes: 0.05, // chance de faire une faute de frappe dans un message
   rateCoup: 0.2, // chance de rater un coup
+  accents: 0.2, // chance de garder les accents d'un mot (on les tape rarement dans un chat)
 };
 
 // Delai avant d'envoyer un message, d'apres le test de Turing de Jones et Bergen :
@@ -53,6 +54,15 @@ function ecrireCommeJoueur(texte) {
   return (texte.charAt(0).toLowerCase() + texte.slice(1)).replace(/\.$/, '');
 }
 
+// Dans un chat on met rarement les accents : chaque mot accentue garde ses accents
+// avec la probabilite `garder` (ex. 0.2), sinon "sérieux" devient "serieux".
+function enleverAccents(texte, garder) {
+  return texte
+    .split(' ')
+    .map((mot) => (Math.random() < garder ? mot : mot.normalize('NFD').replace(/[̀-ͯ]/g, '')))
+    .join(' ');
+}
+
 // Temps de reaction humain : environ 250 ms (plus ou moins 40 ms).
 function reactionMs() {
   return Math.max(150, gauss(250, 40));
@@ -76,4 +86,4 @@ function delaiEntreCoups() {
   return Math.max(300, gauss(650, 150));
 }
 
-module.exports = { STYLE_DEFAUT, uniform, gauss, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, reactionMs, delaiAvantAction, frapper, delaiEntreCoups };
+module.exports = { STYLE_DEFAUT, uniform, gauss, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, reactionMs, delaiAvantAction, frapper, delaiEntreCoups };

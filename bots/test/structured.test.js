@@ -123,3 +123,9 @@ test('faute de frappe : inverse deux lettres et propose parfois la correction', 
   assert.deepStrictEqual([...f.texte].sort(), [...'pioche'].sort());
   assert.ok(f.correction === null || f.correction === '*pioche');
 });
+
+test('accents : enlevés au hasard selon la probabilité de les garder', () => {
+  const { enleverAccents } = require('../src/agent/humanizer');
+  assert.strictEqual(enleverAccents('bien joué sérieux', 0), 'bien joue serieux');
+  assert.strictEqual(enleverAccents('bien joué sérieux', 1), 'bien joué sérieux');
+});
