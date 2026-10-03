@@ -101,7 +101,7 @@ class Agent {
       this.onEvent({ type: 'serveur', text }, arriveeDepart ? null : 'message du serveur');
     });
     bot.on('death', () => this.onEvent({ type: 'mort', text: 'tu es mort et tu as réapparu' }, 'tu viens de mourir'));
-    bot.on('kicked', (reason) => this.logger.write('errors', { agent: this.username, message: 'expulsé', detail: String(reason) }));
+    bot.on('kicked', (reason) => this.logger.write('errors', { agent: this.username, message: 'expulsé', detail: typeof reason === 'string' ? reason : JSON.stringify(reason) }));
     bot.on('error', (err) => this.logger.write('errors', { agent: this.username, message: 'erreur client', detail: err.message }));
     bot.on('end', (reason) => this.onEnd(reason));
   }
