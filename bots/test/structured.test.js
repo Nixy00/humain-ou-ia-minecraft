@@ -160,3 +160,10 @@ test('écrire comme un joueur : pas de majuscule au début, pas de point final, 
   const { ecrireCommeJoueur } = require('../src/agent/humanizer');
   assert.strictEqual(ecrireCommeJoueur('Mdr t’es où.'), "mdr t'es où");
 });
+
+test('répétition : "wsh tes ou frr" puis "wsh tes ou jte vois pas" est refusé', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  a.memory.actions.push({ name: 'parler', args: { message: "wsh t'es ou frr ?" } });
+  assert.strictEqual(a.verifierRepetition('parler', { message: "wsh t'es ou jte vois pas mdr" }).length, 1);
+});

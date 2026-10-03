@@ -119,7 +119,7 @@ class Agent {
   verifierRepetition(name, args) {
     if (name !== 'parler' && name !== 'murmurer') return [];
     // normalize('NFD') sépare les accents des lettres, puis on ne garde que a-z ("où" devient "ou").
-    const debut = (t) => t.normalize('NFD').toLowerCase().replace(/[^a-z]/g, '').slice(0, 12);
+    const debut = (t) => t.normalize('NFD').toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
     const derniers = this.memory.actions.filter((a) => a.name === name).slice(-3).map((a) => debut(a.args.message));
     return derniers.includes(debut(args.message)) ? ['tu as déjà écrit presque la même chose, dis autre chose ou attends'] : [];
   }
