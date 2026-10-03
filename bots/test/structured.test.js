@@ -182,3 +182,19 @@ test('une demande de joueur n\'est pas écrasée par la minuterie', () => {
   assert.strictEqual(a.raisonPrevue, 'message de SAHYGO');
   clearTimeout(a.decideTimer);
 });
+
+test('fil de conversation : messages reçus et envoyés dans l\'ordre, sans les réflexes', () => {
+  const { Agent } = require('../src/agent/agent');
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: { agent: { maxEvents: 15 } }, gateway: {}, logger: { write() {} } });
+  a.onEvent({ type: 'chat', from: 'SAHYGO', text: 'viens' }, null);
+  a.retenirMessage({ type: 'chat', from: 'Joueur4', text: 'jarrive' });
+  a.onEvent({ type: 'reflexe', text: 'auto_defense : spider' }, null);
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 0 } };
+  const texte = observe(bot, { blocksArray: [] }, a.memory);
+  assert.ok(texte.indexOf('<SAHYGO> viens') < texte.indexOf('<toi> jarrive'));
+  assert.ok(texte.split('Autres évènements')[1].includes('auto_defense'));
+  assert.ok(!texte.split('Autres évènements')[0].includes('auto_defense'));
+});

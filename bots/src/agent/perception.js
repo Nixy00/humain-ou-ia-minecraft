@@ -67,17 +67,25 @@ function observe(bot, mcData, memory) {
   ];
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
 
-  lines.push('', 'Derniers évènements (du plus ancien au plus récent) :');
-  if (memory.events.length === 0) lines.push('- aucun');
-  for (const e of memory.events) {
-    if (e.type === 'chat') lines.push(`- [chat, ${agoText(e.t)}] <${e.from}> ${e.text}`);
-    else if (e.type === 'whisper') lines.push(`- [message privé de ${e.from}, ${agoText(e.t)}] ${e.text}`);
-    else lines.push(`- [${e.type}, ${agoText(e.t)}] ${e.text}`);
+  // Le chat est affiché comme une vraie conversation : les messages des autres et les tiens, dans l'ordre.
+  lines.push('', 'Conversation dans le chat (du plus ancien au plus récent, <toi> = tes messages) :');
+  if (memory.chat.length === 0) lines.push('- personne n\'a encore parlé');
+  for (const m of memory.chat) {
+    const qui = m.from === bot.username ? 'toi' : m.from;
+    let prive = '';
+    if (m.type === 'whisper') prive = m.from === bot.username ? ` (en privé à ${m.to})` : ' (en privé)';
+    lines.push(`- [${agoText(m.t)}] <${qui}>${prive} ${m.text}`);
   }
 
-  lines.push('', 'Tes dernières actions :');
-  if (memory.actions.length === 0) lines.push('- aucune');
-  for (const a of memory.actions) {
+  lines.push('', 'Autres évènements récents :');
+  if (memory.events.length === 0) lines.push('- aucun');
+  for (const e of memory.events) lines.push(`- [${e.type}, ${agoText(e.t)}] ${e.text}`);
+
+  // Les messages sont déjà dans la conversation, on ne les répète pas ici.
+  const actions = memory.actions.filter((a) => a.name !== 'parler' && a.name !== 'murmurer');
+  lines.push('', 'Tes dernières actions dans le jeu :');
+  if (actions.length === 0) lines.push('- aucune');
+  for (const a of actions) {
     lines.push(`- ${a.name} ${JSON.stringify(a.args)} -> ${a.ok ? 'réussi' : 'échec'} : ${a.result} (${agoText(a.t)})`);
   }
   return lines.join('\n');

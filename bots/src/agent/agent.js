@@ -39,7 +39,7 @@ class Agent {
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], actions: [], objectif: null };
+    this.memory = { events: [], chat: [], actions: [], objectif: null };
     this.seq = 0;
     this.busy = false;
     this.pendingReason = null;
@@ -106,10 +106,20 @@ class Agent {
     bot.on('end', (reason) => this.onEnd(reason));
   }
 
+  // Le chat (messages reçus et envoyés) est gardé à part des autres évènements :
+  // les réflexes et les arrivées de joueurs ne doivent pas faire disparaître la conversation.
+  retenirMessage(message) {
+    this.memory.chat.push({ ...message, t: Date.now() });
+    if (this.memory.chat.length > 20) this.memory.chat.shift();
+  }
+
   onEvent(event, reason) {
-    const e = { ...event, t: Date.now() };
-    this.memory.events.push(e);
-    if (this.memory.events.length > this.cfg.agent.maxEvents) this.memory.events.shift();
+    if (event.type === 'chat' || event.type === 'whisper') {
+      this.retenirMessage(event);
+    } else {
+      this.memory.events.push({ ...event, t: Date.now() });
+      if (this.memory.events.length > this.cfg.agent.maxEvents) this.memory.events.shift();
+    }
     this.logger.write('events', { agent: this.username, ...event });
     if (reason) this.schedule(reason, this.cfg.agent.chatDebounceMs);
   }
@@ -204,10 +214,15 @@ class Agent {
         agent: this.username, decision_id: decisionId, tool: choice.name, args,
         ok: res.ok, result: res.result, humanize_delay_ms: Math.round(delay), duration_ms: Date.now() - tAction,
       });
+      const type = choice.name === 'murmurer' ? 'whisper' : 'chat';
+      if ((choice.name === 'parler' || choice.name === 'murmurer') && res.ok) {
+        this.retenirMessage({ type, from: this.username, to: args.joueur, text: args.message });
+      }
       // Après une faute de frappe, le joueur envoie parfois la correction ("*mot").
       if (correction && res.ok) {
         await sleep(uniform(1500, 3000));
         bot.chat(choice.name === 'murmurer' ? `/msg ${args.joueur} ${correction}` : correction);
+        this.retenirMessage({ type, from: this.username, to: args.joueur, text: correction });
         this.logger.write('actions', { agent: this.username, decision_id: decisionId, tool: 'correction', args: { message: correction }, ok: true });
       }
       this.memory.actions.push({ name: choice.name, args, ok: res.ok, result: res.result, t: Date.now() });
