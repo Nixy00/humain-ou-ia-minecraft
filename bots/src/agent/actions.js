@@ -175,7 +175,7 @@ const executors = {
     if (mined === 0) throw new Error(`aucun ${bloc} atteignable à moins de 32 blocs, essaie d'explorer`);
     // On annonce ce qui est vraiment entré dans l'inventaire, pas seulement les blocs cassés.
     const gagnes = nbObjets() - objetsAvant;
-    if (gagnes === 0) throw new Error(`${mined} bloc(s) cassé(s) mais rien ramassé`);
+    if (gagnes <= 0) throw new Error(`${mined} bloc(s) cassé(s) mais rien gagné (objets pas ramassés, ou perdus en mourant)`);
     return `${gagnes} objet(s) ramassé(s) en cassant ${mined} ${bloc}${mined < quantite ? ' (pas plus pour le moment)' : ''}`;
   },
 
