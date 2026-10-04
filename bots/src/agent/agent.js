@@ -50,6 +50,7 @@ class Agent {
     bot.once('spawn', () => {
       this.reconnectDelay = 5000;
       this.mcData = minecraftData(bot.version);
+      this.ouvrirVue(bot);
       const moves = new Movements(bot);
       moves.canDig = false; // on ne casse pas de blocs pour se déplacer (constructions des autres)
       bot.pathfinder.setMovements(moves);
@@ -125,6 +126,22 @@ class Agent {
     }
     this.logger.write('events', { agent: this.username, ...event });
     if (reason) this.schedule(reason, this.cfg.agent.chatDebounceMs);
+  }
+
+  // Vue 3D du bot dans un navigateur (option AGENT_VUE_PORT) : on regarde l'IA jouer en direct.
+  // Joueur4 sur le port AGENT_VUE_PORT, Joueur5 sur le suivant, etc.
+  ouvrirVue(bot) {
+    if (!this.cfg.agent.vuePort) return;
+    let viewer;
+    try {
+      viewer = require('prismarine-viewer').mineflayer;
+    } catch {
+      this.log("prismarine-viewer n'est pas installé : pas de vue 3D");
+      return;
+    }
+    const port = this.cfg.agent.vuePort + Math.max(0, this.cfg.game.agents.indexOf(this.username));
+    viewer(bot, { port, firstPerson: false });
+    this.log(`vue 3D sur le port ${port} (http://adresse-de-la-machine:${port})`);
   }
 
   noterEtat() {
@@ -337,6 +354,7 @@ class Agent {
   }
 
   onEnd(reason) {
+    if (this.bot && this.bot.viewer) this.bot.viewer.close(); // libère le port de la vue 3D avant de se reconnecter
     clearInterval(this.tickTimer);
     clearInterval(this.reflexTimer);
     clearInterval(this.etatTimer);

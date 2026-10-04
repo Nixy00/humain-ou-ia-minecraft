@@ -20,5 +20,9 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "optionalDependencies": {
+    "canvas": "^3.2.3",
+    "prismarine-viewer": "^1.33.0"
   }
 }

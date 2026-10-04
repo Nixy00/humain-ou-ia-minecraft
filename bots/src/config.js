@@ -65,5 +65,7 @@ module.exports = {
     // true pour les parties de test entre IA : elles jouent même sans humain connecté.
     sansHumain: envBool('AGENT_SANS_HUMAIN', false),
     joinDelayMaxMs: envInt('AGENT_JOIN_DELAY_MAX_MS', 20000),
+    // Port de la vue 3D dans un navigateur (0 = pas de vue).
+    vuePort: envInt('AGENT_VUE_PORT', 0),
   },
 };
