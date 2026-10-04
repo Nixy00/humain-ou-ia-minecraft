@@ -299,3 +299,18 @@ test('perception : la nuit, peu de vie et faim sans nourriture sont signalés', 
   assert.ok(texte.includes('peu de vie'));
   assert.ok(texte.includes('rien à manger'));
 });
+
+test('perception : idées de bon sens (bois sans pioche, trop de bois, faim sans nourriture)', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null };
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 12,
+    inventory: { items: () => [{ name: 'oak_log', count: 40 }] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+  const texte = observe(bot, { blocksArray: [] }, memory);
+  assert.ok(texte.includes('une table de craft puis une pioche'));
+  assert.ok(texte.includes('beaucoup de bois'));
+  assert.ok(texte.includes('chasse un animal'));
+  bot.inventory.items = () => [{ name: 'oak_log', count: 2 }, { name: 'wooden_pickaxe', count: 1 }];
+  bot.food = 20;
+  assert.ok(!observe(bot, { blocksArray: [] }, memory).includes('Idées'));
+});

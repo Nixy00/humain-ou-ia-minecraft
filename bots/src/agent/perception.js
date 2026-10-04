@@ -72,6 +72,14 @@ function observe(bot, mcData, memory) {
   if (bot.health <= 8) situation.push('tu as peu de vie : évite les monstres et mange si tu peux');
   if (bot.food <= 8 && !aManger) situation.push("tu as faim et rien à manger : cherche à manger (animaux, pommes, demander à quelqu'un)");
   if (situation.length > 0) lines.push(`Attention : ${situation.join(' ; ')}.`);
+
+  // Bon sens de joueur (pas de "speedrun") : il accumulait 60 bûches sans jamais faire d'outil.
+  const nb = (fin) => bot.inventory.items().filter((i) => i.name.endsWith(fin)).reduce((s, i) => s + i.count, 0);
+  const idees = [];
+  if (nb('_log') + nb('_planks') >= 3 && nb('_pickaxe') === 0) idees.push('tu as du bois : tu peux faire des planches, une table de craft puis une pioche');
+  if (nb('_log') >= 32) idees.push('tu as déjà beaucoup de bois, fais autre chose avec');
+  if (bot.food <= 14 && !aManger) idees.push('tu commences à avoir faim et tu n\'as rien à manger : chasse un animal (vache, cochon, poulet, mouton) ou trouve des pommes');
+  if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {
