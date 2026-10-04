@@ -251,3 +251,39 @@ test('etat.jsonl : vie, faim, position et inventaire du bot', () => {
   assert.deepStrictEqual([lignes[0].vie, lignes[0].faim, lignes[0].x, lignes[0].nuit], [18, 12, 10, true]);
   assert.deepStrictEqual(lignes[0].inventaire, { oak_log: 5 });
 });
+
+function botDeTest(extra) {
+  const { Vec3 } = require('vec3');
+  return {
+    entity: { position: new Vec3(0, 64, 0), yaw: 0 }, blockAt: () => ({ name: 'air' }),
+    pathfinder: { isMoving: () => false, setGoal: () => {} }, nearestEntity: () => null,
+    look: async () => {}, lookAt: async () => {}, setControlState: () => {},
+    health: 20, food: 20, registry: { foodsByName: { bread: {}, rotten_flesh: {}, spider_eye: {} } },
+    inventory: { items: () => [] }, equip: async () => {}, consume: async () => {}, ...extra,
+  };
+}
+
+test('réflexe : il mange tout seul quand il a faim (jamais un oeil d\'araignée)', async () => {
+  const { startReflexes } = require('../src/agent/reflexes');
+  const evts = [];
+  const bot = botDeTest({ food: 10, inventory: { items: () => [{ name: 'spider_eye' }, { name: 'bread' }] } });
+  const t = startReflexes(bot, { rateCoup: 0 }, () => null, (type, d) => evts.push(`${type} ${d}`));
+  await new Promise((r) => setTimeout(r, 300));
+  clearInterval(t);
+  assert.ok(evts.includes('manger bread'));
+});
+
+test('réflexe : vie basse et monstre proche, il fuit au lieu de se battre', async () => {
+  const { startReflexes } = require('../src/agent/reflexes');
+  const { Vec3 } = require('vec3');
+  const evts = [];
+  let but = null;
+  const zombie = { name: 'zombie', type: 'hostile', position: new Vec3(3, 64, 0), height: 1.9 };
+  const bot = botDeTest({ health: 4, nearestEntity: (f) => (f(zombie) ? zombie : null), pathfinder: { isMoving: () => false, setGoal: (g) => { but = g; } } });
+  const t = startReflexes(bot, { rateCoup: 0 }, () => null, (type, d) => evts.push(type));
+  await new Promise((r) => setTimeout(r, 250));
+  clearInterval(t);
+  assert.ok(evts.includes('fuite'));
+  assert.ok(!evts.includes('auto_defense'));
+  assert.ok(but && bot.interrompre);
+});

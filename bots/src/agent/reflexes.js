@@ -1,8 +1,12 @@
 // Reflexes : petites reactions automatiques sans passer par le LLM (il met plusieurs secondes a repondre).
 // Idee reprise des "modes" de Mindcraft.
 
+const { goals } = require('mineflayer-pathfinder');
 const { isHostile } = require('./perception');
 const { uniform, reactionMs, frapper, delaiEntreCoups } = require('./humanizer');
+
+// Nourriture qui empoisonne : on ne la mange jamais automatiquement.
+const MAUVAISE_BOUFFE = ['spider_eye', 'poisonous_potato', 'pufferfish', 'suspicious_stew'];
 
 // actionEnCours() : nom de l'action que le bot execute, ou null s'il n'en fait pas.
 function startReflexes(bot, style, actionEnCours, onReflexe) {
@@ -12,6 +16,8 @@ function startReflexes(bot, style, actionEnCours, onReflexe) {
   let anciennePos = null;
   let immobileDepuis = Date.now();
   let prochainRegard = Date.now() + 5000;
+  let enFuite = 0; // heure du debut de la fuite, 0 si on ne fuit pas
+  let enTrainDeManger = false;
 
   function reagir() {
     if (!bot.entity) return;
@@ -27,9 +33,34 @@ function startReflexes(bot, style, actionEnCours, onReflexe) {
       sauteDansEau = dansEau;
     }
 
-    // 2. Auto-defense : un monstre a moins de 4 blocs, on le frappe.
+    // Survie (idee des modes "self_preservation" de Mindcraft). Le bot mourait en boucle (34 fois en 20 min).
+    // a) Fuir : vie basse et un monstre pas loin -> on s'eloigne au lieu de se battre (8 s maximum).
+    const danger = bot.nearestEntity((e) => isHostile(e) && pos.distanceTo(e.position) < 10);
+    if (!enFuite && bot.health <= 6 && danger) {
+      enFuite = maintenant;
+      bot.interrompre = true; // arrete l'action en cours
+      bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(danger, 16)), true);
+      onReflexe('fuite', `${danger.name}, vie ${Math.round(bot.health)}`);
+    } else if (enFuite && (!danger || maintenant - enFuite > 8000)) {
+      bot.pathfinder.setGoal(null);
+      enFuite = 0;
+    }
+    // b) Manger tout seul : faim <= 14 quand il ne fait rien, ou faim <= 6 meme pendant une action.
+    if (!enTrainDeManger && !enFuite && !danger && bot.food <= 14 && (!actionEnCours() || bot.food <= 6)) {
+      const nourriture = bot.inventory.items().find((i) => bot.registry.foodsByName[i.name] && !MAUVAISE_BOUFFE.includes(i.name) && (i.name !== 'rotten_flesh' || bot.food <= 6));
+      if (nourriture) {
+        enTrainDeManger = true;
+        bot.equip(nourriture, 'hand')
+          .then(() => bot.consume())
+          .then(() => onReflexe('manger', nourriture.name))
+          .catch(() => {})
+          .finally(() => { enTrainDeManger = false; });
+      }
+    }
+
+    // 2. Auto-defense : un monstre a moins de 4 blocs, on le frappe (sauf s'il est en train de fuir).
     // Comme un joueur : un temps de reaction, un rythme irregulier et des coups rates.
-    const mob = bot.nearestEntity((e) => isHostile(e) && pos.distanceTo(e.position) < 4);
+    const mob = enFuite ? null : bot.nearestEntity((e) => isHostile(e) && pos.distanceTo(e.position) < 4);
     if (mob && mob !== derniereCible) {
       derniereCible = mob;
       prochainCoup = maintenant + reactionMs();
