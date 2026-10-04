@@ -63,6 +63,8 @@ class Agent {
       }, this.cfg.agent.tickMs);
       // Les réflexes sont journalisés et ajoutés aux évènements vus par le LLM (sans déclencher de décision).
       this.reflexTimer = startReflexes(bot, this.style, () => this.actionEnCours, (type, detail) => this.onEvent({ type: 'reflexe', text: `${type} : ${detail}` }, null));
+      // État du bot toutes les 10 s (etat.jsonl) : pour suivre la partie en direct et pouvoir la rejouer.
+      this.etatTimer = setInterval(() => this.noterEtat(), 10000);
       this.schedule('tu viens de te connecter', uniform(3000, 8000));
     });
 
@@ -123,6 +125,27 @@ class Agent {
     }
     this.logger.write('events', { agent: this.username, ...event });
     if (reason) this.schedule(reason, this.cfg.agent.chatDebounceMs);
+  }
+
+  noterEtat() {
+    const bot = this.bot;
+    if (!bot || !bot.entity) return;
+    const p = bot.entity.position;
+    const inventaire = {};
+    for (const i of bot.inventory.items()) inventaire[i.name] = (inventaire[i.name] || 0) + i.count;
+    const heure = bot.time ? bot.time.timeOfDay : null;
+    this.logger.write('etat', {
+      agent: this.username,
+      vie: Math.round(bot.health),
+      faim: bot.food,
+      x: Math.round(p.x), y: Math.round(p.y), z: Math.round(p.z),
+      dimension: bot.game.dimension,
+      nuit: heure !== null && heure >= 12300 && heure <= 23850,
+      niveau_xp: bot.experience ? bot.experience.level : null,
+      inventaire,
+      action: this.actionEnCours,
+      joueurs: Object.keys(bot.players).length,
+    });
   }
 
   humainConnecte() {
@@ -316,6 +339,7 @@ class Agent {
   onEnd(reason) {
     clearInterval(this.tickTimer);
     clearInterval(this.reflexTimer);
+    clearInterval(this.etatTimer);
     clearTimeout(this.decideTimer);
     this.raisonPrevue = null;
     this.mcData = null;

@@ -238,3 +238,16 @@ test('humain connecté : les autres agents ne comptent pas', () => {
   a.bot.players.SAHYGO = {};
   assert.strictEqual(a.humainConnecte(), true);
 });
+
+test('etat.jsonl : vie, faim, position et inventaire du bot', () => {
+  const { Agent } = require('../src/agent/agent');
+  const { Vec3 } = require('vec3');
+  const lignes = [];
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: {}, gateway: {}, logger: { write: (f, r) => lignes.push({ f, ...r }) } });
+  a.bot = { entity: { position: new Vec3(10.4, 64, -3.6) }, health: 17.5, food: 12, game: { dimension: 'overworld' }, time: { timeOfDay: 13000 },
+    experience: { level: 2 }, players: { Joueur4: {}, SAHYGO: {} }, inventory: { items: () => [{ name: 'oak_log', count: 3 }, { name: 'oak_log', count: 2 }] } };
+  a.noterEtat();
+  assert.strictEqual(lignes[0].f, 'etat');
+  assert.deepStrictEqual([lignes[0].vie, lignes[0].faim, lignes[0].x, lignes[0].nuit], [18, 12, 10, true]);
+  assert.deepStrictEqual(lignes[0].inventaire, { oak_log: 5 });
+});
