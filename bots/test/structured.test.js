@@ -287,3 +287,15 @@ test('réflexe : vie basse et monstre proche, il fuit au lieu de se battre', asy
   assert.ok(!evts.includes('auto_defense'));
   assert.ok(but && bot.interrompre);
 });
+
+test('perception : la nuit, peu de vie et faim sans nourriture sont signalés', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null };
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 5, food: 4,
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 15000 }, registry: { foodsByName: {} } };
+  const texte = observe(bot, { blocksArray: [] }, memory);
+  assert.ok(texte.includes("c'est la nuit"));
+  assert.ok(texte.includes('peu de vie'));
+  assert.ok(texte.includes('rien à manger'));
+});

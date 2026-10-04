@@ -65,6 +65,13 @@ function observe(bot, mcData, memory) {
     `Monstres proches : ${hostiles.join(', ') || 'aucun'}.`,
     `Blocs utiles autour : ${nearbyBlocks(bot, mcData)}.`,
   ];
+  // Ce qu'un joueur normal remarquerait sur sa situation (seulement quand c'est utile).
+  const aManger = bot.inventory.items().some((i) => bot.registry && bot.registry.foodsByName && bot.registry.foodsByName[i.name]);
+  const situation = [];
+  if (moment === 'nuit') situation.push("c'est la nuit, les monstres sortent : reste à l'abri ou près des autres, ne pars pas loin");
+  if (bot.health <= 8) situation.push('tu as peu de vie : évite les monstres et mange si tu peux');
+  if (bot.food <= 8 && !aManger) situation.push("tu as faim et rien à manger : cherche à manger (animaux, pommes, demander à quelqu'un)");
+  if (situation.length > 0) lines.push(`Attention : ${situation.join(' ; ')}.`);
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {
