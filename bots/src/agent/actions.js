@@ -195,9 +195,15 @@ const executors = {
       // On dit au modèle ce qui manque vraiment (avant : "il faut un établi" alors qu'il manquait des planches).
       // Une recette a parfois plusieurs variantes (planches de chêne, d'épicéa...) : on garde celle
       // à laquelle il manque le moins de choses, et on ne liste que ce qui manque.
+      // Si un ingrédient manquant peut être fabriqué tout de suite, on le dit (le modèle ne faisait pas le lien
+      // entre "il te manque 4 oak_planks" et ses 48 bûches).
       const manquePour = (r) => r.delta
         .filter((d) => d.count < 0 && countItem(bot, mcData.items[d.id].name) < -d.count)
-        .map((d) => `${-d.count - countItem(bot, mcData.items[d.id].name)} ${mcData.items[d.id].name}`);
+        .map((d) => {
+          const nom = mcData.items[d.id].name;
+          const faisable = bot.recipesFor(d.id, null, 1, table).length > 0;
+          return `${-d.count - countItem(bot, nom)} ${nom}${faisable ? ` (tu peux en fabriquer : fabriquer ${nom})` : ''}`;
+        });
       const variantes = bot.recipesAll(item.id, null, true);
       if (variantes.length === 0) throw new Error(`${objet} ne se fabrique pas`);
       const modele = variantes.reduce((a, b) => (manquePour(b).length < manquePour(a).length ? b : a));
