@@ -36,6 +36,7 @@ const TOOLS = [
   tool('donner', "Aller vers un joueur et lui lancer des objets de ton inventaire (troc).", { joueur: JOUEUR, objet: ID_MC, quantite: { type: 'integer', minimum: 1, maximum: 64 } }, ['joueur', 'objet', 'quantite']),
   tool('manger', 'Manger de la nourriture de ton inventaire.', {}),
   tool('se_defendre', 'Attaquer le monstre hostile le plus proche (jamais un joueur).', {}),
+  tool('chasser', 'Tuer un animal proche pour sa viande (vache, cochon, poulet, mouton, lapin) et la ramasser.', {}),
   tool('explorer', 'Marcher dans une direction au hasard pour trouver des ressources.', {}),
   tool('attendre', 'Ne rien faire pendant quelques secondes.', { secondes: { type: 'integer', minimum: 1, maximum: 30 } }, ['secondes']),
   tool('aller_a', 'Marcher jusqu\'à des coordonnées.', { x: COORD, y: COORD, z: COORD }, ['x', 'y', 'z']),
@@ -241,6 +242,30 @@ const executors = {
     return `${food.name} mangé`;
   },
 
+  async chasser(bot, args, { style }) {
+    const animal = bot.nearestEntity((e) => ANIMAUX.includes(e.name) && bot.entity.position.distanceTo(e.position) < 24);
+    if (!animal) throw new Error('aucun animal à moins de 24 blocs, explore pour en trouver');
+    const arme = bot.inventory.items().find((i) => i.name.endsWith('_sword')) ?? bot.inventory.items().find((i) => i.name.endsWith('_axe'));
+    if (arme) await bot.equip(arme, 'hand');
+    bot.pathfinder.setGoal(new goals.GoalFollow(animal, 1), true);
+    const fin = Date.now() + 20000;
+    while (animal.isValid && Date.now() < fin && !bot.interrompre) {
+      if (bot.entity.position.distanceTo(animal.position) < 3.5) frapper(bot, animal, style.rateCoup);
+      await sleep(delaiEntreCoups());
+    }
+    bot.pathfinder.setGoal(null);
+    if (animal.isValid) throw new Error(`le ${animal.name} s'est enfui`);
+    // Ramasser ce qui est tombé (viande, cuir, laine...).
+    await sleep(500);
+    const objet = bot.nearestEntity((e) => e.name === 'item' && e.position.distanceTo(bot.entity.position) < 8);
+    if (objet) {
+      try {
+        await allerAvecLimite(bot, new goals.GoalNear(objet.position.x, objet.position.y, objet.position.z, 0.5), 5000);
+      } catch { /* hors d'atteinte */ }
+    }
+    return `${animal.name} tué`;
+  },
+
   async se_defendre(bot, args, { style }) {
     const mob = bot.nearestEntity((e) => isHostile(e) && bot.entity.position.distanceTo(e.position) < 12);
     if (!mob) throw new Error('aucun monstre proche');
@@ -438,6 +463,8 @@ const executors = {
 // Blocs que l'on peut remplacer en posant un bloc (vides ou herbes).
 const BLOCS_VIDES = ['air', 'cave_air', 'water', 'lava', 'grass', 'short_grass', 'tall_grass', 'snow', 'fern', 'dead_bush'];
 const DIRECTIONS = [new Vec3(0, -1, 0), new Vec3(0, 1, 0), new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)];
+// Animaux que l'on peut chasser pour manger.
+const ANIMAUX = ['cow', 'pig', 'chicken', 'sheep', 'rabbit'];
 const COMBUSTIBLES = ['coal', 'charcoal', '_planks', '_log'];
 
 // Le pathfinder peut tourner en rond sans fin vers un point en l'air (ex. une bûche en haut d'un arbre) :

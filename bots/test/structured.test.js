@@ -314,3 +314,8 @@ test('perception : idées de bon sens (bois sans pioche, trop de bois, faim sans
   bot.food = 20;
   assert.ok(!observe(bot, { blocksArray: [] }, memory).includes('Idées'));
 });
+
+test('chasser : sans animal proche, le bot est invité à explorer', async () => {
+  const { executors } = require('../src/agent/actions');
+  await assert.rejects(executors.chasser({ nearestEntity: () => null }, {}, { style: { rateCoup: 0 } }), /explore/);
+});
