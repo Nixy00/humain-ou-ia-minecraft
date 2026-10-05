@@ -196,7 +196,7 @@ const executors = {
       // Pas de table posée mais une dans l'inventaire : il la pose à côté, comme n'importe quel joueur
       // (dans un test il avait la table sur lui et n'a jamais pensé à la poser pour faire sa pioche).
       if (!table && countItem(bot, 'crafting_table') > 0 && bot.recipesAll(item.id, null, true).some((r) => r.requiresTable)) {
-        await poserTableACote(bot);
+        await poserACote(bot, 'crafting_table');
         table = bot.findBlock({ matching: mcData.blocksByName.crafting_table.id, maxDistance: 6 });
       }
       if (table) {
@@ -432,8 +432,13 @@ const executors = {
   async cuire(bot, { objet, quantite }, { mcData }) {
     const item = findItem(bot, objet);
     const n = Math.min(quantite, countItem(bot, objet));
-    const bloc = bot.findBlock({ matching: mcData.blocksByName.furnace.id, maxDistance: 32 });
-    if (!bloc) throw new Error('aucun four à proximité');
+    let bloc = bot.findBlock({ matching: mcData.blocksByName.furnace.id, maxDistance: 32 });
+    // Un four dans l'inventaire mais pas posé : il le pose à côté, comme pour la table de craft.
+    if (!bloc && countItem(bot, 'furnace') > 0) {
+      await poserACote(bot, 'furnace');
+      bloc = bot.findBlock({ matching: mcData.blocksByName.furnace.id, maxDistance: 6 });
+    }
+    if (!bloc) throw new Error('aucun four à proximité (fabrique un furnace avec 8 cobblestone)');
 
     // Combustible : du charbon (8 cuissons chacun) ou du bois (1 cuisson chacun, on simplifie).
     const combustible = bot.inventory.items().find((i) => i.name !== objet && COMBUSTIBLES.some((c) => i.name.endsWith(c)));
@@ -534,15 +539,15 @@ function nomObjet(bot, mcData, objet) {
   return nom;
 }
 
-// Pose la table de craft de l'inventaire sur une case libre juste à côté du bot.
-async function poserTableACote(bot) {
+// Pose un bloc de l'inventaire (table de craft, four...) sur une case libre juste à côté du bot.
+async function poserACote(bot, nom) {
   const pieds = bot.entity.position.floored();
   for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [0, 2]]) {
     const c = pieds.offset(dx, 0, dz);
     const dessous = bot.blockAt(c.offset(0, -1, 0));
     if (BLOCS_VIDES.includes(bot.blockAt(c).name) && dessous && !BLOCS_VIDES.includes(dessous.name)) {
       try {
-        await executors.poser_bloc(bot, { bloc: 'crafting_table', x: c.x, y: c.y, z: c.z });
+        await executors.poser_bloc(bot, { bloc: nom, x: c.x, y: c.y, z: c.z });
         return;
       } catch { /* case pas posable, on essaie la suivante */ }
     }
