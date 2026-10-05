@@ -37,7 +37,7 @@ const TOOLS = [
   tool('manger', 'Manger de la nourriture de ton inventaire.', {}),
   tool('se_defendre', 'Attaquer le monstre hostile le plus proche (jamais un joueur).', {}),
   tool('chasser', 'Tuer un animal proche pour sa viande (vache, cochon, poulet, mouton, lapin) et la ramasser.', {}),
-  tool('explorer', 'Marcher dans une direction au hasard pour trouver des ressources.', {}),
+  tool('explorer', 'Partir explorer plus loin (30 à 60 blocs, en gardant à peu près la même direction) pour trouver des ressources ou des animaux.', {}),
   tool('attendre', 'Ne rien faire pendant quelques secondes.', { secondes: { type: 'integer', minimum: 1, maximum: 30 } }, ['secondes']),
   tool('aller_a', 'Marcher jusqu\'à des coordonnées.', { x: COORD, y: COORD, z: COORD }, ['x', 'y', 'z']),
   tool('suivre_joueur', 'Suivre un joueur pendant quelques secondes.', { joueur: JOUEUR, secondes: { type: 'integer', minimum: 5, maximum: 50 } }, ['joueur', 'secondes']),
@@ -251,8 +251,8 @@ const executors = {
   },
 
   async chasser(bot, args, { style }) {
-    const animal = bot.nearestEntity((e) => ANIMAUX.includes(e.name) && bot.entity.position.distanceTo(e.position) < 24);
-    if (!animal) throw new Error('aucun animal à moins de 24 blocs, explore pour en trouver');
+    const animal = bot.nearestEntity((e) => ANIMAUX.includes(e.name) && bot.entity.position.distanceTo(e.position) < 48);
+    if (!animal) throw new Error('aucun animal à moins de 48 blocs, explore plus loin dans une direction');
     const arme = bot.inventory.items().find((i) => i.name.endsWith('_sword')) ?? bot.inventory.items().find((i) => i.name.endsWith('_axe'));
     if (arme) await bot.equip(arme, 'hand');
     bot.pathfinder.setGoal(new goals.GoalFollow(animal, 1), true);
@@ -290,11 +290,19 @@ const executors = {
   },
 
   async explorer(bot) {
-    const angle = Math.random() * 2 * Math.PI;
-    const dist = 15 + Math.random() * 15;
+    // Comme un joueur qui cherche quelque chose : il garde à peu près la même direction d'une fois sur l'autre
+    // et va assez loin (avant : direction au hasard à 15-30 blocs, il tournait en rond dans la même zone).
+    if (bot.capExploration === undefined) bot.capExploration = Math.random() * 2 * Math.PI;
+    const angle = bot.capExploration + (Math.random() - 0.5) * 0.8;
+    const dist = 30 + Math.random() * 30;
     const p = bot.entity.position;
-    await bot.pathfinder.goto(new goals.GoalNearXZ(p.x + Math.cos(angle) * dist, p.z + Math.sin(angle) * dist, 2));
-    return 'zone explorée';
+    try {
+      await allerAvecLimite(bot, new goals.GoalNearXZ(p.x + Math.cos(angle) * dist, p.z + Math.sin(angle) * dist, 3), 40000);
+    } catch {
+      bot.capExploration = undefined; // bloqué (mer, falaise...) : la prochaine fois, une autre direction
+      throw new Error('passage bloqué dans cette direction, essaie une autre fois');
+    }
+    return `zone explorée (${Math.round(bot.entity.position.distanceTo(p))} blocs parcourus)`;
   },
 
   async attendre(bot, { secondes }) {

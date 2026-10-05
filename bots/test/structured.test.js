@@ -330,3 +330,22 @@ test('noms d\'objets approximatifs traduits en identifiants Minecraft', () => {
   assert.strictEqual(nomObjet(bot, mcData, 'Bâtons'), 'stick');
   assert.strictEqual(nomObjet(bot, mcData, 'wooden_pickaxe'), 'wooden_pickaxe');
 });
+
+test('explorer : garde à peu près la même direction et va à 30-60 blocs, change si bloqué', async () => {
+  const { executors } = require('../src/agent/actions');
+  const { Vec3 } = require('vec3');
+  const buts = [];
+  let bloque = false;
+  const bot = { entity: { position: new Vec3(0, 64, 0) },
+    pathfinder: { goto: async (g) => { buts.push(g); if (bloque) throw new Error('bloqué'); }, setGoal: () => {} } };
+  await executors.explorer(bot);
+  await executors.explorer(bot);
+  const cap = (g) => Math.atan2(g.z, g.x);
+  const ecart = Math.abs(Math.atan2(Math.sin(cap(buts[0]) - cap(buts[1])), Math.cos(cap(buts[0]) - cap(buts[1]))));
+  assert.ok(ecart <= 0.8, `écart de direction ${ecart}`);
+  const dist = Math.hypot(buts[0].x, buts[0].z);
+  assert.ok(dist >= 30 && dist <= 60, `distance ${dist}`);
+  bloque = true;
+  await assert.rejects(executors.explorer(bot), /bloqué/);
+  assert.strictEqual(bot.capExploration, undefined);
+});
