@@ -64,6 +64,10 @@ function checkArgs(bot, name, args) {
   // bot.chat exécute tout texte commençant par "/" comme une commande serveur (ex. /designer) :
   // le modèle, ou un joueur qui le manipule par le chat, pourrait voter ou agir hors des outils.
   if (typeof args.message === 'string' && args.message.trimStart().startsWith('/')) errors.push('un message ne peut pas commencer par "/"');
+  // Seul sur le serveur, il n'a personne à qui parler (il écrivait "t es ou" dans le vide).
+  if (name === 'parler' && bot.players && Object.keys(bot.players).length <= 1) {
+    errors.push("personne d'autre n'est connecté, inutile de parler : fais autre chose");
+  }
   // Sur un vrai serveur, 97 % des messages font 10 mots ou moins : au-delà de 12, on fait reformuler.
   if (typeof args.message === 'string' && args.message.trim().split(/\s+/).length > 12) {
     errors.push('message trop long, un joueur écrit court (quelques mots)');
@@ -224,7 +228,9 @@ const executors = {
     const possible = Math.min(...recipe.delta.filter((d) => d.count < 0).map((d) => Math.floor(countItem(bot, mcData.items[d.id].name) / -d.count)));
     const before = countItem(bot, objet);
     await bot.craft(recipe, Math.min(quantite, possible), table);
-    await sleep(500); // le temps que le serveur mette l'inventaire à jour
+    // On attend que le serveur mette l'inventaire à jour (2 s max) : avant, il annonçait parfois
+    // "0 wooden_pickaxe fabriqué(s)" alors que c'était réussi, et le modèle recommençait.
+    for (let i = 0; i < 20 && countItem(bot, objet) === before; i++) await sleep(100);
     return `${countItem(bot, objet) - before} ${objet} fabriqué(s)`;
   },
 

@@ -86,7 +86,7 @@ test('extractJson et validate', () => {
 
 test('checkArgs refuse les commandes serveur dans les messages', () => {
   const { checkArgs } = require('../src/agent/actions');
-  const bot = { username: 'Joueur4', players: { Joueur1: {} } };
+  const bot = { username: 'Joueur4', players: { Joueur1: {}, Joueur4: {} } }; // comme dans le jeu, le bot est dans la liste
   assert.strictEqual(checkArgs(bot, 'parler', { message: ' /designer Joueur1 ia' }).length, 1);
   assert.strictEqual(checkArgs(bot, 'murmurer', { joueur: 'Joueur1', message: 'salut' }).length, 0);
   assert.strictEqual(checkArgs(bot, 'parler', { message: 'jai 3 oak_log' }).length, 1);
@@ -372,4 +372,10 @@ test('perception : animal en vue et faim -> conseil de chasser', () => {
   const texte = observe(bot, { blocksArray: [] }, memory);
   assert.ok(texte.includes('Animaux en vue : cow à 20 blocs.'));
   assert.ok(texte.includes('(cow à 20 blocs) : chasser'));
+});
+
+test('parler : refusé quand personne d\'autre n\'est connecté', () => {
+  const { checkArgs } = require('../src/agent/actions');
+  assert.strictEqual(checkArgs({ username: 'Joueur4', players: { Joueur4: {} } }, 'parler', { message: 't ou' }).length, 1);
+  assert.strictEqual(checkArgs({ username: 'Joueur4', players: { Joueur4: {}, SAHYGO: {} } }, 'parler', { message: 't ou' }).length, 0);
 });
