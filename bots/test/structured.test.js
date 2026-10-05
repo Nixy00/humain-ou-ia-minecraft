@@ -132,12 +132,6 @@ test('accents : enlevés au hasard selon la probabilité de les garder', () => {
 });
 
 
-test('collecter de la cobble = miner de la pierre', () => {
-  const { resolveBlocks } = require('../src/agent/actions');
-  const mcData = require('minecraft-data')('1.20.4');
-  assert.deepStrictEqual(resolveBlocks(mcData, 'cobblestone'), [mcData.blocksByName.stone.id]);
-});
-
 test('répétition : un message qui commence comme un des derniers est refusé', () => {
   const { Agent } = require('../src/agent/agent');
   const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
@@ -322,13 +316,12 @@ test('chasser : sans animal proche, le bot est invité à explorer', async () =>
 
 test('noms d\'objets approximatifs traduits en identifiants Minecraft', () => {
   const { nomObjet } = require('../src/agent/actions');
-  const mcData = require('minecraft-data')('1.20.4');
-  const bot = { inventory: { items: () => [{ name: 'birch_log', count: 4 }] } };
-  assert.strictEqual(nomObjet(bot, mcData, 'planches'), 'birch_planks');
-  assert.strictEqual(nomObjet(bot, mcData, 'planks'), 'birch_planks');
-  assert.strictEqual(nomObjet(bot, mcData, 'table de craft'), 'crafting_table');
-  assert.strictEqual(nomObjet(bot, mcData, 'Bâtons'), 'stick');
-  assert.strictEqual(nomObjet(bot, mcData, 'wooden_pickaxe'), 'wooden_pickaxe');
+  const bot = { registry: require('minecraft-data')('1.20.4'), inventory: { items: () => [{ name: 'birch_log', count: 4 }] } };
+  assert.strictEqual(nomObjet(bot, 'planches'), 'birch_planks');
+  assert.strictEqual(nomObjet(bot, 'planks'), 'birch_planks');
+  assert.strictEqual(nomObjet(bot, 'table de craft'), 'crafting_table');
+  assert.strictEqual(nomObjet(bot, 'Bâtons'), 'stick');
+  assert.strictEqual(nomObjet(bot, 'wooden_pickaxe'), 'wooden_pickaxe');
 });
 
 test('explorer : garde à peu près la même direction et va à 30-60 blocs, change si bloqué', async () => {
@@ -387,4 +380,10 @@ test('mission : affichée au bot à chaque décision', () => {
   const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
     inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
   assert.ok(observe(bot, { blocksArray: [] }, memory).includes('Ta mission : obtenir un casque en diamant'));
+});
+
+test('actions Mindcraft : sans les ingredients, le modele recoit ce qui manque', async () => {
+  const { executors } = require('../src/agent/actions');
+  const bot = { version: '1.20.4', registry: require('minecraft-data')('1.20.4'), inventory: { items: () => [] }, recipesFor: () => [] };
+  await assert.rejects(executors.fabriquer(bot, { objet: 'stone_pickaxe', quantite: 1 }), /resources/);
 });

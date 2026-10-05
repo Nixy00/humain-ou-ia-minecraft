@@ -6,7 +6,7 @@
 // de Mindcraft : Copyright (c) 2024 Kolby Nottingham, licence MIT,
 // https://github.com/mindcraft-bots/mindcraft
 
-const { goals, Movements } = require('mineflayer-pathfinder');
+const { goals } = require('mineflayer-pathfinder');
 const { Vec3 } = require('vec3');
 const { isHostile, ANIMAUX } = require('./perception');
 const { frapper, delaiEntreCoups } = require('./humanizer');
@@ -52,9 +52,31 @@ const TOOLS = [
   tool('cuire', 'Cuire ou fondre des objets dans un four proche (ex. raw_iron, beef). Il faut du combustible (charbon ou bois).', { objet: ID_MC, quantite: { type: 'integer', minimum: 1, maximum: 5 } }, ['objet', 'quantite']),
   tool('dormir', 'Dormir dans le lit le plus proche (la nuit seulement).', {}),
   tool('fuir', 'S\'éloigner du monstre le plus proche.', {}),
+  tool('creuser', 'Creuser droit vers le bas (pour descendre vers les minerais : fer vers y=16, diamant vers y=-58).', { blocs: { type: 'integer', minimum: 1, maximum: 20 } }, ['blocs']),
+  tool('remonter', 'Remonter à la surface.', {}),
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Les actions de jeu (miner, fabriquer, cuire, coffres...) viennent de Mindcraft (src/mindcraft, licence MIT) :
+// notre version maison ratait trop souvent. Mindcraft écrit ses messages dans bot.output et
+// regarde bot.interrupt_code pour s'arrêter : on relie ça à notre bot.interrompre.
+let skills = null;
+async function mindcraft(bot, nom, ...args) {
+  if (!skills) {
+    skills = await import('../mindcraft/skills.mjs');
+    (await import('../mindcraft/mcdata.mjs')).init(bot.version);
+  }
+  if (!bot.modes) {
+    bot.modes = { isOn: () => false, pause() {}, unpause() {} };
+    Object.defineProperty(bot, 'interrupt_code', { get: () => bot.interrompre });
+  }
+  bot.output = '';
+  const ok = await skills[nom](bot, ...args);
+  const texte = bot.output.trim().replace(/\n/g, ' ') || 'fait';
+  if (ok === false) throw new Error(texte);
+  return texte;
+}
 
 // Contrôles qui dépendent de l'état du jeu (le schéma ne peut pas les exprimer).
 function checkArgs(bot, name, args) {
@@ -82,23 +104,6 @@ function checkArgs(bot, name, args) {
   return errors;
 }
 
-// Résout "oak_log" exactement, sinon "log" -> tous les blocs dont le nom contient "log".
-// Certains objets ne se trouvent pas tels quels : on mine le bloc qui les donne.
-const BLOC_QUI_DONNE = { cobblestone: 'stone', cobbled_deepslate: 'deepslate', flint: 'gravel' };
-
-function resolveBlocks(mcData, name) {
-  name = BLOC_QUI_DONNE[name] || name;
-  // Une bûche demandée (oak_log...) accepte toutes les essences : autour du spawn il ne reste parfois que du bouleau.
-  if (name.endsWith('_log')) return mcData.blocksArray.filter((b) => b.name.endsWith('_log') && !b.name.startsWith('stripped')).map((b) => b.id);
-  const exact = mcData.blocksByName[name];
-  if (exact) return [exact.id];
-  return mcData.blocksArray.filter((b) => b.name.includes(name)).map((b) => b.id);
-}
-
-function countItem(bot, name) {
-  return bot.inventory.items().filter((i) => i.name === name).reduce((s, i) => s + i.count, 0);
-}
-
 function playerEntity(bot, name) {
   const e = bot.players[name]?.entity;
   if (!e) throw new Error(`${name} n'est pas visible`);
@@ -117,134 +122,27 @@ const executors = {
   },
 
   async aller_vers_joueur(bot, { joueur }) {
-    const p = playerEntity(bot, joueur).position;
-    await bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 2));
-    return `arrivé près de ${joueur}`;
+    return mindcraft(bot, 'goToPlayer', joueur, 2);
   },
 
-  async collecter(bot, { bloc, quantite }, { mcData }) {
-    const ids = resolveBlocks(mcData, bloc);
-    if (ids.length === 0) throw new Error(`bloc inconnu : ${bloc}`);
-    // Sans pioche, la pierre et les minerais ne donnent rien : on le dit tout de suite au modèle.
-    const outils = mcData.blocks[ids[0]].harvestTools;
-    if (outils && !bot.inventory.items().some((i) => outils[i.type])) {
-      throw new Error(`il te faut une pioche pour ${bloc} : coupe du bois, fais des planches, une table de craft puis une pioche en bois`);
+  async collecter(bot, args) {
+    let bloc = nomObjet(bot, args.bloc);
+    // Une bûche demandée accepte toutes les essences : autour du spawn il ne reste parfois que du bouleau.
+    if (bloc.endsWith('_log')) {
+      const proche = bot.findBlock({ matching: (b) => b.name.endsWith('_log') && !b.name.startsWith('stripped'), maxDistance: 64 });
+      if (proche) bloc = proche.name;
     }
-
-    // Pendant la récolte on a le droit de creuser (sinon les blocs dans la roche sont inatteignables),
-    // et on abandonne vite un bloc inatteignable pour essayer le suivant.
-    const avant = { movements: bot.pathfinder.movements, timeout: bot.pathfinder.thinkTimeout };
-    const moves = new Movements(bot);
-    moves.canDig = true;
-    bot.pathfinder.setMovements(moves);
-    bot.pathfinder.thinkTimeout = 3000;
-
-    const nbObjets = () => bot.inventory.items().reduce((s, i) => s + i.count, 0);
-    const objetsAvant = nbObjets();
-    let mined = 0;
-    let rates = 0;
-    const inatteignables = new Set();
-    const fin = Date.now() + 45000; // on rend la main avant la limite de 60 s d'une action
-    try {
-      while (mined < quantite && rates < 3 && Date.now() < fin && !bot.interrompre) {
-        const positions = bot.findBlocks({ matching: ids, maxDistance: 32, count: 10 });
-        const pos = positions.find((p) => !inatteignables.has(p.toString()));
-        if (!pos) break;
-        const target = bot.blockAt(pos);
-        try {
-          await allerAvecLimite(bot, new goals.GoalLookAtBlock(target.position, bot.world), 15000);
-        } catch {
-          inatteignables.add(pos.toString());
-          rates++;
-          continue;
-        }
-        const toolItem = bot.pathfinder.bestHarvestTool(target);
-        if (toolItem) await bot.equip(toolItem, 'hand');
-        await bot.dig(target);
-        mined++;
-        // Aller ramasser l'objet tombé, là où il a atterri (il peut rouler ou tomber plus bas).
-        await sleep(400);
-        const objet = bot.nearestEntity((e) => e.name === 'item' && e.position.distanceTo(target.position) < 6);
-        if (objet) {
-          const p = objet.position;
-          try {
-            await allerAvecLimite(bot, new goals.GoalNear(p.x, p.y, p.z, 0.5), 5000);
-          } catch { /* objet hors d'atteinte : tant pis */ }
-          await sleep(300);
-        }
-      }
-    } finally {
-      bot.pathfinder.setMovements(avant.movements);
-      bot.pathfinder.thinkTimeout = avant.timeout;
-    }
-    if (mined === 0) throw new Error(`aucun ${bloc} atteignable à moins de 32 blocs, essaie d'explorer`);
-    // On annonce ce qui est vraiment entré dans l'inventaire, pas seulement les blocs cassés.
-    const gagnes = nbObjets() - objetsAvant;
-    if (gagnes <= 0) throw new Error(`${mined} bloc(s) cassé(s) mais rien gagné (objets pas ramassés, ou perdus en mourant)`);
-    return `${gagnes} objet(s) ramassé(s) en cassant ${mined} ${bloc}${mined < quantite ? ' (pas plus pour le moment)' : ''}`;
+    return mindcraft(bot, 'collectBlock', bloc, args.quantite);
   },
 
-  async fabriquer(bot, args, { mcData }) {
-    const objet = nomObjet(bot, mcData, args.objet);
-    const quantite = args.quantite;
-    const item = mcData.itemsByName[objet];
-    if (!item) throw new Error(`objet inconnu : ${args.objet} (utilise l'identifiant Minecraft anglais, ex. oak_planks, crafting_table, wooden_pickaxe)`);
-    let table = null;
-    let recipe = bot.recipesFor(item.id, null, 1, null)[0];
-    if (!recipe) {
-      table = bot.findBlock({ matching: mcData.blocksByName.crafting_table.id, maxDistance: 32 });
-      // Pas de table posée mais une dans l'inventaire : il la pose à côté, comme n'importe quel joueur
-      // (dans un test il avait la table sur lui et n'a jamais pensé à la poser pour faire sa pioche).
-      if (!table && countItem(bot, 'crafting_table') > 0 && bot.recipesAll(item.id, null, true).some((r) => r.requiresTable)) {
-        await poserACote(bot, 'crafting_table');
-        table = bot.findBlock({ matching: mcData.blocksByName.crafting_table.id, maxDistance: 6 });
-      }
-      if (table) {
-        await bot.pathfinder.goto(new goals.GoalLookAtBlock(table.position, bot.world));
-        recipe = bot.recipesFor(item.id, null, 1, table)[0];
-      }
-    }
-    if (!recipe) {
-      // On dit au modèle ce qui manque vraiment (avant : "il faut un établi" alors qu'il manquait des planches).
-      // Une recette a parfois plusieurs variantes (planches de chêne, d'épicéa...) : on garde celle
-      // à laquelle il manque le moins de choses, et on ne liste que ce qui manque.
-      // Si un ingrédient manquant peut être fabriqué tout de suite, on le dit (le modèle ne faisait pas le lien
-      // entre "il te manque 4 oak_planks" et ses 48 bûches).
-      const manquePour = (r) => r.delta
-        .filter((d) => d.count < 0 && countItem(bot, mcData.items[d.id].name) < -d.count)
-        .map((d) => {
-          const nom = mcData.items[d.id].name;
-          const faisable = bot.recipesFor(d.id, null, 1, table).length > 0;
-          return `${-d.count - countItem(bot, nom)} ${nom}${faisable ? ` (tu peux en fabriquer : fabriquer ${nom})` : ''}`;
-        });
-      const variantes = bot.recipesAll(item.id, null, true);
-      if (variantes.length === 0) throw new Error(`${objet} ne se fabrique pas`);
-      const modele = variantes.reduce((a, b) => (manquePour(b).length < manquePour(a).length ? b : a));
-      const manque = manquePour(modele);
-      if (modele.requiresTable && !table) manque.push('une table de craft posée à côté (poser_bloc crafting_table)');
-      throw new Error(`il te manque : ${manque.join(', ')}`);
-    }
-    // On fabrique autant que possible avec ce qu'on a (sinon "missing ingredient" si on en demande trop).
-    const possible = Math.min(...recipe.delta.filter((d) => d.count < 0).map((d) => Math.floor(countItem(bot, mcData.items[d.id].name) / -d.count)));
-    const before = countItem(bot, objet);
-    await bot.craft(recipe, Math.min(quantite, possible), table);
-    // On attend que le serveur mette l'inventaire à jour (2 s max) : avant, il annonçait parfois
-    // "0 wooden_pickaxe fabriqué(s)" alors que c'était réussi, et le modèle recommençait.
-    for (let i = 0; i < 20 && countItem(bot, objet) === before; i++) await sleep(100);
-    return `${countItem(bot, objet) - before} ${objet} fabriqué(s)`;
+  async fabriquer(bot, args) {
+    const objet = nomObjet(bot, args.objet);
+    if (!bot.registry.itemsByName[objet]) throw new Error(`objet inconnu : ${args.objet} (utilise l'identifiant Minecraft anglais, ex. oak_planks)`);
+    return mindcraft(bot, 'craftRecipe', objet, args.quantite);
   },
 
-  async donner(bot, { joueur, objet, quantite }, { mcData }) {
-    const item = mcData.itemsByName[objet];
-    if (!item) throw new Error(`objet inconnu : ${objet}`);
-    const have = countItem(bot, objet);
-    if (have === 0) throw new Error(`tu n'as pas de ${objet}`);
-    const target = playerEntity(bot, joueur);
-    await bot.pathfinder.goto(new goals.GoalNear(target.position.x, target.position.y, target.position.z, 2));
-    await bot.lookAt(target.position.offset(0, target.height, 0));
-    const n = Math.min(quantite, have);
-    await bot.toss(item.id, null, n);
-    return `${n} ${objet} lancé(s) à ${joueur}`;
+  async donner(bot, { joueur, objet, quantite }) {
+    return mindcraft(bot, 'giveToPlayer', nomObjet(bot, objet), joueur, quantite);
   },
 
   async manger(bot) {
@@ -269,15 +167,9 @@ const executors = {
     }
     bot.pathfinder.setGoal(null);
     if (animal.isValid) throw new Error(`le ${animal.name} s'est enfui`);
-    // Ramasser ce qui est tombé (viande, cuir, laine...).
+    // Ramasser ce qui est tombé (viande, cuir, laine...) : dans un test il tuait le poulet sans prendre la viande.
     await sleep(500);
-    const objet = bot.nearestEntity((e) => e.name === 'item' && e.position.distanceTo(bot.entity.position) < 8);
-    if (objet) {
-      try {
-        await allerAvecLimite(bot, new goals.GoalNear(objet.position.x, objet.position.y, objet.position.z, 0.5), 5000);
-      } catch { /* hors d'atteinte */ }
-    }
-    return `${animal.name} tué`;
+    return `${animal.name} tué. ${await mindcraft(bot, 'pickupNearbyItems')}`;
   },
 
   async se_defendre(bot, args, { style }) {
@@ -317,8 +209,7 @@ const executors = {
   },
 
   async aller_a(bot, { x, y, z }) {
-    await bot.pathfinder.goto(new goals.GoalNear(x, y, z, 1));
-    return `arrivé en ${x} ${y} ${z}`;
+    return mindcraft(bot, 'goToPosition', x, y, z, 1);
   },
 
   async suivre_joueur(bot, { joueur, secondes }) {
@@ -335,162 +226,53 @@ const executors = {
   },
 
   async poser_bloc(bot, { bloc, x, y, z }) {
-    const item = findItem(bot, bloc);
-    const cible = new Vec3(x, y, z);
-    const actuel = bot.blockAt(cible);
-    if (!actuel) throw new Error('cet endroit est trop loin');
-    if (!BLOCS_VIDES.includes(actuel.name)) throw new Error(`il y a déjà ${actuel.name} à cet endroit`);
-
-    // Il faut un bloc voisin sur lequel "s'appuyer" pour poser le nouveau bloc.
-    let appui = null;
-    let face = null;
-    for (const d of DIRECTIONS) {
-      const voisin = bot.blockAt(cible.plus(d));
-      if (voisin && !BLOCS_VIDES.includes(voisin.name)) {
-        appui = voisin;
-        face = new Vec3(-d.x, -d.y, -d.z);
-        break;
-      }
-    }
-    if (!appui) throw new Error('rien autour pour poser le bloc dessus');
-
-    // Trop loin : on s'approche. Debout sur la case : on se décale.
-    if (bot.entity.position.distanceTo(cible) > 4.5) {
-      await bot.pathfinder.goto(new goals.GoalNear(x, y, z, 3));
-    }
-    const pieds = bot.entity.position.floored();
-    if (pieds.equals(cible) || pieds.offset(0, 1, 0).equals(cible)) {
-      await bot.pathfinder.goto(new goals.GoalInvert(new goals.GoalNear(x, y, z, 2)));
-    }
-    await bot.equip(item, 'hand');
-    await bot.placeBlock(appui, face);
-    return `${bloc} posé en ${x} ${y} ${z}`;
+    return mindcraft(bot, 'placeBlock', nomObjet(bot, bloc), x, y, z);
   },
 
   async casser_bloc(bot, { x, y, z }) {
-    const b = bot.blockAt(new Vec3(x, y, z));
-    if (!b || BLOCS_VIDES.includes(b.name)) throw new Error('il n\'y a pas de bloc à cet endroit');
-    await bot.pathfinder.goto(new goals.GoalLookAtBlock(b.position, bot.world));
-    const outil = bot.pathfinder.bestHarvestTool(b);
-    if (outil) await bot.equip(outil, 'hand');
-    await bot.dig(b);
-    return `${b.name} cassé`;
+    return mindcraft(bot, 'breakBlockAt', x, y, z);
   },
 
   async equiper(bot, { objet }) {
-    const item = findItem(bot, objet);
-    let place = 'hand';
-    if (objet.endsWith('_helmet')) place = 'head';
-    if (objet.endsWith('_chestplate')) place = 'torso';
-    if (objet.endsWith('_leggings')) place = 'legs';
-    if (objet.endsWith('_boots')) place = 'feet';
-    if (objet === 'shield') place = 'off-hand';
-    await bot.equip(item, place);
-    return `${objet} équipé`;
+    return mindcraft(bot, 'equip', nomObjet(bot, objet));
   },
 
   async jeter(bot, { objet, quantite }) {
-    const item = findItem(bot, objet);
-    const n = Math.min(quantite, countItem(bot, objet));
-    await bot.toss(item.type, null, n);
-    return `${n} ${objet} jeté(s)`;
+    return mindcraft(bot, 'discard', nomObjet(bot, objet), quantite);
   },
 
-  async deposer_coffre(bot, { objet, quantite }, { mcData }) {
-    const item = findItem(bot, objet);
-    const n = Math.min(quantite, countItem(bot, objet));
-    const coffre = await ouvrirCoffre(bot, mcData);
-    try {
-      await coffre.deposit(item.type, null, n);
-    } finally {
-      coffre.close();
-    }
-    return `${n} ${objet} rangé(s) dans le coffre`;
+  async deposer_coffre(bot, { objet, quantite }) {
+    return mindcraft(bot, 'putInChest', nomObjet(bot, objet), quantite);
   },
 
-  async prendre_coffre(bot, { objet, quantite }, { mcData }) {
-    const coffre = await ouvrirCoffre(bot, mcData);
-    try {
-      const items = coffre.containerItems().filter((i) => i.name === objet);
-      const dispo = items.reduce((s, i) => s + i.count, 0);
-      if (dispo === 0) throw new Error(`pas de ${objet} dans le coffre`);
-      const n = Math.min(quantite, dispo);
-      await coffre.withdraw(items[0].type, null, n);
-      return `${n} ${objet} pris dans le coffre`;
-    } finally {
-      coffre.close();
-    }
+  async prendre_coffre(bot, { objet, quantite }) {
+    return mindcraft(bot, 'takeFromChest', nomObjet(bot, objet), quantite);
   },
 
-  async voir_coffre(bot, args, { mcData }) {
-    const coffre = await ouvrirCoffre(bot, mcData);
-    const contenu = coffre.containerItems().map((i) => `${i.name} x${i.count}`);
-    coffre.close();
-    return contenu.length ? `le coffre contient : ${contenu.join(', ')}` : 'le coffre est vide';
+  async voir_coffre(bot) {
+    return mindcraft(bot, 'viewChest');
   },
 
-  async cuire(bot, { objet, quantite }, { mcData }) {
-    const item = findItem(bot, objet);
-    const n = Math.min(quantite, countItem(bot, objet));
-    let bloc = bot.findBlock({ matching: mcData.blocksByName.furnace.id, maxDistance: 32 });
-    // Un four dans l'inventaire mais pas posé : il le pose à côté, comme pour la table de craft.
-    if (!bloc && countItem(bot, 'furnace') > 0) {
-      await poserACote(bot, 'furnace');
-      bloc = bot.findBlock({ matching: mcData.blocksByName.furnace.id, maxDistance: 6 });
-    }
-    if (!bloc) throw new Error('aucun four à proximité (fabrique un furnace avec 8 cobblestone)');
-
-    // Combustible : du charbon (8 cuissons chacun) ou du bois (1 cuisson chacun, on simplifie).
-    const combustible = bot.inventory.items().find((i) => i.name !== objet && COMBUSTIBLES.some((c) => i.name.endsWith(c)));
-    if (!combustible) throw new Error('pas de combustible (charbon ou bois)');
-    const nbCombustible = combustible.name.endsWith('coal') ? Math.ceil(n / 8) : n;
-    if (combustible.count < nbCombustible) throw new Error(`pas assez de ${combustible.name}`);
-
-    await bot.pathfinder.goto(new goals.GoalLookAtBlock(bloc.position, bot.world));
-    const four = await bot.openFurnace(bloc);
-    let cuits = 0;
-    try {
-      if (!four.fuelItem()) await four.putFuel(combustible.type, null, nbCombustible);
-      await four.putInput(item.type, null, n);
-      // Une cuisson dure 10 secondes dans Minecraft.
-      const fin = Date.now() + n * 10000 + 3000;
-      while (cuits < n && Date.now() < fin) {
-        await sleep(1000);
-        if (four.outputItem()) {
-          const sortie = await four.takeOutput();
-          cuits += sortie ? sortie.count : 0;
-        }
-      }
-    } finally {
-      // On récupère ce qui n'a pas cuit (sinon les objets restent coincés dans le four).
-      if (four.inputItem()) await four.takeInput().catch(() => {});
-      four.close();
-    }
-    if (cuits === 0) throw new Error(`${objet} ne peut pas être cuit`);
-    return `${cuits} ${objet} cuit(s)`;
+  async cuire(bot, { objet, quantite }) {
+    return mindcraft(bot, 'smeltItem', nomObjet(bot, objet), quantite);
   },
 
   async dormir(bot) {
-    const lit = bot.findBlock({ matching: (b) => bot.isABed(b), maxDistance: 32 });
-    if (!lit) throw new Error('aucun lit à proximité');
-    await bot.pathfinder.goto(new goals.GoalLookAtBlock(lit.position, bot.world));
-    await bot.sleep(lit); // erreur si ce n'est pas la nuit ou s'il y a des monstres autour
-    return 'tu dors';
+    return mindcraft(bot, 'goToBed');
   },
 
   async fuir(bot) {
-    const mob = bot.nearestEntity((e) => isHostile(e) && bot.entity.position.distanceTo(e.position) < 16);
-    if (!mob) throw new Error('aucun monstre proche');
-    const p = mob.position;
-    await bot.pathfinder.goto(new goals.GoalInvert(new goals.GoalNear(p.x, p.y, p.z, 16)));
-    return `tu t'es éloigné du ${mob.name}`;
+    return mindcraft(bot, 'avoidEnemies', 16);
+  },
+
+  async creuser(bot, { blocs }) {
+    return mindcraft(bot, 'digDown', blocs);
+  },
+
+  async remonter(bot) {
+    return mindcraft(bot, 'goToSurface');
   },
 };
-
-// Blocs que l'on peut remplacer en posant un bloc (vides ou herbes).
-const BLOCS_VIDES = ['air', 'cave_air', 'water', 'lava', 'grass', 'short_grass', 'tall_grass', 'snow', 'fern', 'dead_bush'];
-const DIRECTIONS = [new Vec3(0, -1, 0), new Vec3(0, 1, 0), new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)];
-const COMBUSTIBLES = ['coal', 'charcoal', '_planks', '_log'];
 
 // Le pathfinder peut tourner en rond sans fin vers un point en l'air (ex. une bûche en haut d'un arbre) :
 // on arrête le déplacement au bout de ms millisecondes.
@@ -527,44 +309,16 @@ const ALIAS = {
   four: 'furnace', coffre: 'chest', torche: 'torch', torches: 'torch',
 };
 
-function nomObjet(bot, mcData, objet) {
+function nomObjet(bot, objet) {
   let nom = String(objet).toLowerCase().trim();
   nom = ALIAS[nom] || nom.replace(/ /g, '_');
-  if (mcData.itemsByName[nom]) return nom;
+  if (bot.registry.itemsByName[nom]) return nom;
   // "planks" ou "log" sans essence : on prend l'essence de bois que le bot possède.
   if (nom === 'planks' || nom === 'log') {
     const bois = bot.inventory.items().find((i) => i.name.endsWith('_log'));
     return `${bois ? bois.name.replace('_log', '') : 'oak'}_${nom}`;
   }
   return nom;
-}
-
-// Pose un bloc de l'inventaire (table de craft, four...) sur une case libre juste à côté du bot.
-async function poserACote(bot, nom) {
-  const pieds = bot.entity.position.floored();
-  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [0, 2]]) {
-    const c = pieds.offset(dx, 0, dz);
-    const dessous = bot.blockAt(c.offset(0, -1, 0));
-    if (BLOCS_VIDES.includes(bot.blockAt(c).name) && dessous && !BLOCS_VIDES.includes(dessous.name)) {
-      try {
-        await executors.poser_bloc(bot, { bloc: nom, x: c.x, y: c.y, z: c.z });
-        return;
-      } catch { /* case pas posable, on essaie la suivante */ }
-    }
-  }
-}
-
-function findItem(bot, name) {
-  const item = bot.inventory.items().find((i) => i.name === name);
-  if (!item) throw new Error(`tu n'as pas de ${name}`);
-  return item;
-}
-
-async function ouvrirCoffre(bot, mcData) {
-  const bloc = bot.findBlock({ matching: mcData.blocksByName.chest.id, maxDistance: 32 });
-  if (!bloc) throw new Error('aucun coffre à proximité');
-  await bot.pathfinder.goto(new goals.GoalLookAtBlock(bloc.position, bot.world));
-  return bot.openContainer(bloc);
 }
 
 // Exécute une action avec un délai maximal ; renvoie toujours { ok, result }.
@@ -580,6 +334,7 @@ async function execute(bot, name, args, ctx, timeoutMs) {
     const result = await Promise.race([executors[name](bot, args, ctx), timeout]);
     return { ok: true, result };
   } catch (err) {
+    bot.interrompre = true; // sinon une action Mindcraft continue après la limite de temps
     bot.pathfinder.setGoal(null);
     bot.clearControlStates();
     return { ok: false, result: err.message };
@@ -588,4 +343,4 @@ async function execute(bot, name, args, ctx, timeoutMs) {
   }
 }
 
-module.exports = { TOOLS, executors, execute, checkArgs, resolveBlocks, nomObjet };
+module.exports = { TOOLS, executors, execute, checkArgs, nomObjet };

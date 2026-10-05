@@ -46,6 +46,10 @@ class Agent {
     });
     this.bot = bot;
     bot.loadPlugin(pathfinder);
+    // Plugins utilisés par les actions de Mindcraft (récolte, combat, armure mise toute seule).
+    bot.loadPlugin(require('mineflayer-collectblock').plugin);
+    bot.loadPlugin(require('mineflayer-pvp').plugin);
+    bot.loadPlugin(require('mineflayer-armor-manager'));
 
     bot.once('spawn', () => {
       this.reconnectDelay = 5000;
