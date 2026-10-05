@@ -349,3 +349,15 @@ test('explorer : garde à peu près la même direction et va à 30-60 blocs, cha
   await assert.rejects(executors.explorer(bot), /bloqué/);
   assert.strictEqual(bot.capExploration, undefined);
 });
+
+test('perception : idée précise quand il a tout pour une pioche, même affamé', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null };
+  const inv = [{ name: 'oak_planks', count: 64 }, { name: 'stick', count: 35 }, { name: 'crafting_table', count: 1 }];
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 10, food: 0,
+    inventory: { items: () => inv }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+  const texte = observe(bot, { blocksArray: [] }, memory);
+  assert.ok(texte.includes('fabriquer wooden_pickaxe'));
+  assert.ok(texte.includes('chasse un animal'));
+});

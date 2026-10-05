@@ -76,7 +76,16 @@ function observe(bot, mcData, memory) {
   // Bon sens de joueur (pas de "speedrun") : il accumulait 60 bûches sans jamais faire d'outil.
   const nb = (fin) => bot.inventory.items().filter((i) => i.name.endsWith(fin)).reduce((s, i) => s + i.count, 0);
   const idees = [];
-  if (nb('_log') + nb('_planks') >= 3 && nb('_pickaxe') === 0) idees.push('tu as du bois : tu peux faire des planches, une table de craft puis une pioche');
+  // Une idée précise marche mieux avec ce modèle qu'un conseil vague (il avait tout pour une pioche et ne l'a pas faite).
+  // Pioche en bois = 3 planches + 2 bâtons + une table (dans l'inventaire, ou 4 planches de plus pour la fabriquer).
+  const aUneTable = nb('crafting_table') > 0;
+  if (nb('_pickaxe') === 0 && nb('stick') >= 2 && nb('_planks') >= (aUneTable ? 3 : 7)) {
+    idees.push(aUneTable
+      ? 'tu as tout pour une pioche : fabriquer wooden_pickaxe (ta table de craft sera posée toute seule)'
+      : 'tu as tout pour une pioche : fabriquer crafting_table puis wooden_pickaxe');
+  } else if (nb('_log') + nb('_planks') >= 3 && nb('_pickaxe') === 0) {
+    idees.push('tu as du bois : tu peux faire des planches, une table de craft puis une pioche');
+  }
   if (nb('_log') >= 32) idees.push('tu as déjà beaucoup de bois, fais autre chose avec');
   if (bot.food <= 14 && !aManger) idees.push('tu commences à avoir faim et tu n\'as rien à manger : chasse un animal (vache, cochon, poulet, mouton) ou trouve des pommes');
   if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
