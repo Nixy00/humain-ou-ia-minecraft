@@ -189,6 +189,12 @@ const executors = {
     let recipe = bot.recipesFor(item.id, null, 1, null)[0];
     if (!recipe) {
       table = bot.findBlock({ matching: mcData.blocksByName.crafting_table.id, maxDistance: 32 });
+      // Pas de table posée mais une dans l'inventaire : il la pose à côté, comme n'importe quel joueur
+      // (dans un test il avait la table sur lui et n'a jamais pensé à la poser pour faire sa pioche).
+      if (!table && countItem(bot, 'crafting_table') > 0 && bot.recipesAll(item.id, null, true).some((r) => r.requiresTable)) {
+        await poserTableACote(bot);
+        table = bot.findBlock({ matching: mcData.blocksByName.crafting_table.id, maxDistance: 6 });
+      }
       if (table) {
         await bot.pathfinder.goto(new goals.GoalLookAtBlock(table.position, bot.world));
         recipe = bot.recipesFor(item.id, null, 1, table)[0];
@@ -514,6 +520,21 @@ function nomObjet(bot, mcData, objet) {
     return `${bois ? bois.name.replace('_log', '') : 'oak'}_${nom}`;
   }
   return nom;
+}
+
+// Pose la table de craft de l'inventaire sur une case libre juste à côté du bot.
+async function poserTableACote(bot) {
+  const pieds = bot.entity.position.floored();
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [0, 2]]) {
+    const c = pieds.offset(dx, 0, dz);
+    const dessous = bot.blockAt(c.offset(0, -1, 0));
+    if (BLOCS_VIDES.includes(bot.blockAt(c).name) && dessous && !BLOCS_VIDES.includes(dessous.name)) {
+      try {
+        await executors.poser_bloc(bot, { bloc: 'crafting_table', x: c.x, y: c.y, z: c.z });
+        return;
+      } catch { /* case pas posable, on essaie la suivante */ }
+    }
+  }
 }
 
 function findItem(bot, name) {
