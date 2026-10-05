@@ -102,6 +102,7 @@ function observe(bot, mcData, memory) {
       : "tu as faim et rien à manger, aucun animal en vue : explorer pour en trouver (ils sont souvent en bas, dans les plaines)");
   }
   if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
+  if (memory.mission) lines.push(`Ta mission : ${memory.mission}`);
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {

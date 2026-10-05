@@ -379,3 +379,12 @@ test('parler : refusé quand personne d\'autre n\'est connecté', () => {
   assert.strictEqual(checkArgs({ username: 'Joueur4', players: { Joueur4: {} } }, 'parler', { message: 't ou' }).length, 1);
   assert.strictEqual(checkArgs({ username: 'Joueur4', players: { Joueur4: {}, SAHYGO: {} } }, 'parler', { message: 't ou' }).length, 0);
 });
+
+test('mission : affichée au bot à chaque décision', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null, mission: 'obtenir un casque en diamant' };
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+  assert.ok(observe(bot, { blocksArray: [] }, memory).includes('Ta mission : obtenir un casque en diamant'));
+});

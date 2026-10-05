@@ -67,5 +67,7 @@ module.exports = {
     joinDelayMaxMs: envInt('AGENT_JOIN_DELAY_MAX_MS', 20000),
     // Port de la vue 3D dans un navigateur (0 = pas de vue).
     vuePort: envInt('AGENT_VUE_PORT', 0),
+    // Mission donnée par l'organisateur (tests, en attendant les tâches du plugin). Vide = pas de mission.
+    mission: env('AGENT_MISSION', ''),
   },
 };

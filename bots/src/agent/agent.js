@@ -24,7 +24,7 @@ class Agent {
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null };
+    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null, mission: cfg.agent ? cfg.agent.mission : '' };
     this.seq = 0;
     this.busy = false;
     this.pendingReason = null;
