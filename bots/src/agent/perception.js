@@ -77,7 +77,8 @@ function observe(bot, mcData, memory) {
   // Ce qu'un joueur normal remarquerait sur sa situation (seulement quand c'est utile).
   const aManger = bot.inventory.items().some((i) => bot.registry && bot.registry.foodsByName && bot.registry.foodsByName[i.name]);
   const situation = [];
-  if (moment === 'nuit') situation.push("c'est la nuit, les monstres sortent : reste à l'abri ou près des autres, ne pars pas loin");
+  // Avant : "reste à l'abri" et il attendait 8 minutes sans rien faire. Un joueur continue à miner ou crafter.
+  if (moment === 'nuit') situation.push("c'est la nuit, les monstres sortent : ne pars pas loin, mais continue à miner, couper ou fabriquer près de toi");
   if (bot.health <= 8) situation.push('tu as peu de vie : évite les monstres et mange si tu peux');
   if (bot.food <= 8 && !aManger) situation.push("tu as faim et rien à manger : cherche à manger (animaux, pommes, demander à quelqu'un)");
   if (situation.length > 0) lines.push(`Attention : ${situation.join(' ; ')}.`);
@@ -88,12 +89,19 @@ function observe(bot, mcData, memory) {
   // Une idée précise marche mieux avec ce modèle qu'un conseil vague (il avait tout pour une pioche et ne l'a pas faite).
   // Pioche en bois = 3 planches + 2 bâtons + une table (dans l'inventaire, ou 4 planches de plus pour la fabriquer).
   const aUneTable = nb('crafting_table') > 0;
-  if (nb('_pickaxe') === 0 && nb('stick') >= 2 && nb('_planks') >= (aUneTable ? 3 : 7)) {
+  if (nb('_pickaxe') === 0 && nb('cobblestone') < 3 && nb('stick') >= 2 && nb('_planks') >= (aUneTable ? 3 : 7)) {
     idees.push(aUneTable
       ? 'tu as tout pour une pioche : fabriquer wooden_pickaxe (ta table de craft sera posée toute seule)'
       : 'tu as tout pour une pioche : fabriquer crafting_table puis wooden_pickaxe');
   } else if (nb('_log') + nb('_planks') >= 3 && nb('_pickaxe') === 0) {
     idees.push('tu as du bois : tu peux faire des planches, une table de craft puis une pioche');
+  }
+  // Sa pioche en bois s'est cassée et il a réessayé de miner la pierre 7 fois au lieu d'en refaire une.
+  const aPiocheMieux = ['stone_pickaxe', 'iron_pickaxe', 'diamond_pickaxe'].some((p) => nb(p) > 0);
+  if (!aPiocheMieux && nb('cobblestone') >= 3 && (nb('stick') >= 2 || nb('_planks') >= 2)) {
+    idees.push(nb('_pickaxe') === 0
+      ? "tu n'as plus de pioche : fabriquer stone_pickaxe (3 cobblestone + 2 stick)"
+      : 'tu as de la cobblestone : fabriquer stone_pickaxe, elle mine le fer');
   }
   if (nb('_log') >= 32) idees.push('tu as déjà beaucoup de bois, fais autre chose avec');
   if (bot.food <= 14 && !aManger) {

@@ -387,3 +387,15 @@ test('actions Mindcraft : sans les ingredients, le modele recoit ce qui manque',
   const bot = { version: '1.20.4', registry: require('minecraft-data')('1.20.4'), inventory: { items: () => [] }, recipesFor: () => [] };
   await assert.rejects(executors.fabriquer(bot, { objet: 'stone_pickaxe', quantite: 1 }), /resources/);
 });
+
+test('perception : pioche cassee et de la cobble -> idee de pioche en pierre', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null };
+  const inv = [{ name: 'oak_planks', count: 14 }, { name: 'cobblestone', count: 45 }];
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => inv }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+  const texte = observe(bot, { blocksArray: [] }, memory);
+  assert.ok(texte.includes('fabriquer stone_pickaxe'));
+  assert.ok(!texte.includes('wooden_pickaxe'));
+});
