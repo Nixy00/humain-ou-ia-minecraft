@@ -3,6 +3,9 @@
 
 const INTERESTING_BLOCK = /(_log|_ore|_bed|^stone|^cobblestone|^crafting_table|^furnace|^chest|^sand|^gravel|^clay|^wheat|^sugar_cane|^pumpkin|^melon)$/;
 
+// Animaux que l'on peut chasser pour manger.
+const ANIMAUX = ['cow', 'pig', 'chicken', 'sheep', 'rabbit'];
+
 function isHostile(e) {
   return e.type === 'hostile' || e.kind === 'Hostile mobs';
 }
@@ -54,6 +57,11 @@ function observe(bot, mcData, memory) {
   const hostiles = Object.values(bot.entities)
     .filter((e) => isHostile(e) && me.distanceTo(e.position) < 16)
     .map((e) => `${e.name} à ${round(me.distanceTo(e.position))} blocs`);
+  // Le serveur n'envoie les animaux qu'à moins de 48 blocs : au-delà, on ne les voit pas (comme un humain).
+  const animaux = Object.values(bot.entities)
+    .filter((e) => ANIMAUX.includes(e.name) && me.distanceTo(e.position) < 48)
+    .map((e) => `${e.name} à ${round(me.distanceTo(e.position))} blocs`)
+    .slice(0, 5);
   const tod = bot.time?.timeOfDay ?? 0;
   const moment = tod < 12300 || tod > 23850 ? 'jour' : 'nuit';
 
@@ -63,6 +71,7 @@ function observe(bot, mcData, memory) {
     `Joueurs connectés : ${others.map((p) => p.username).join(', ') || 'aucun'}.`,
     `Joueurs visibles : ${visible.join(', ') || 'aucun'}.`,
     `Monstres proches : ${hostiles.join(', ') || 'aucun'}.`,
+    `Animaux en vue : ${animaux.join(', ') || 'aucun'}.`,
     `Blocs utiles autour : ${nearbyBlocks(bot, mcData)}.`,
   ];
   // Ce qu'un joueur normal remarquerait sur sa situation (seulement quand c'est utile).
@@ -87,7 +96,11 @@ function observe(bot, mcData, memory) {
     idees.push('tu as du bois : tu peux faire des planches, une table de craft puis une pioche');
   }
   if (nb('_log') >= 32) idees.push('tu as déjà beaucoup de bois, fais autre chose avec');
-  if (bot.food <= 14 && !aManger) idees.push('tu commences à avoir faim et tu n\'as rien à manger : chasse un animal (vache, cochon, poulet, mouton) ou trouve des pommes');
+  if (bot.food <= 14 && !aManger) {
+    idees.push(animaux.length > 0
+      ? `tu as faim et il y a un animal en vue (${animaux[0]}) : chasser`
+      : "tu as faim et rien à manger, aucun animal en vue : explorer pour en trouver (ils sont souvent en bas, dans les plaines)");
+  }
   if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
@@ -124,4 +137,4 @@ function observe(bot, mcData, memory) {
   return lines.join('\n');
 }
 
-module.exports = { observe, isHostile };
+module.exports = { observe, isHostile, ANIMAUX };

@@ -8,7 +8,7 @@
 
 const { goals, Movements } = require('mineflayer-pathfinder');
 const { Vec3 } = require('vec3');
-const { isHostile } = require('./perception');
+const { isHostile, ANIMAUX } = require('./perception');
 const { frapper, delaiEntreCoups } = require('./humanizer');
 
 // Champs communs. Leurs explications sont dans la consigne système (prompt.js) et pas ici :
@@ -479,8 +479,6 @@ const executors = {
 // Blocs que l'on peut remplacer en posant un bloc (vides ou herbes).
 const BLOCS_VIDES = ['air', 'cave_air', 'water', 'lava', 'grass', 'short_grass', 'tall_grass', 'snow', 'fern', 'dead_bush'];
 const DIRECTIONS = [new Vec3(0, -1, 0), new Vec3(0, 1, 0), new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)];
-// Animaux que l'on peut chasser pour manger.
-const ANIMAUX = ['cow', 'pig', 'chicken', 'sheep', 'rabbit'];
 const COMBUSTIBLES = ['coal', 'charcoal', '_planks', '_log'];
 
 // Le pathfinder peut tourner en rond sans fin vers un point en l'air (ex. une bûche en haut d'un arbre) :

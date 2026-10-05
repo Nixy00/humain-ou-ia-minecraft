@@ -309,7 +309,7 @@ test('perception : idées de bon sens (bois sans pioche, trop de bois, faim sans
   const texte = observe(bot, { blocksArray: [] }, memory);
   assert.ok(texte.includes('une table de craft puis une pioche'));
   assert.ok(texte.includes('beaucoup de bois'));
-  assert.ok(texte.includes('chasse un animal'));
+  assert.ok(texte.includes('explorer pour en trouver'));
   bot.inventory.items = () => [{ name: 'oak_log', count: 2 }, { name: 'wooden_pickaxe', count: 1 }];
   bot.food = 20;
   assert.ok(!observe(bot, { blocksArray: [] }, memory).includes('Idées'));
@@ -359,5 +359,17 @@ test('perception : idée précise quand il a tout pour une pioche, même affamé
     inventory: { items: () => inv }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
   const texte = observe(bot, { blocksArray: [] }, memory);
   assert.ok(texte.includes('fabriquer wooden_pickaxe'));
-  assert.ok(texte.includes('chasse un animal'));
+  assert.ok(texte.includes('explorer pour en trouver'));
+});
+
+test('perception : animal en vue et faim -> conseil de chasser', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null };
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, health: 20, food: 8,
+    entities: { 1: { name: 'cow', position: new Vec3(20, 64, 0) }, 2: { name: 'cow', position: new Vec3(90, 64, 0) } },
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+  const texte = observe(bot, { blocksArray: [] }, memory);
+  assert.ok(texte.includes('Animaux en vue : cow à 20 blocs.'));
+  assert.ok(texte.includes('(cow à 20 blocs) : chasser'));
 });
