@@ -180,9 +180,11 @@ const executors = {
     return `${gagnes} objet(s) ramassé(s) en cassant ${mined} ${bloc}${mined < quantite ? ' (pas plus pour le moment)' : ''}`;
   },
 
-  async fabriquer(bot, { objet, quantite }, { mcData }) {
+  async fabriquer(bot, args, { mcData }) {
+    const objet = nomObjet(bot, mcData, args.objet);
+    const quantite = args.quantite;
     const item = mcData.itemsByName[objet];
-    if (!item) throw new Error(`objet inconnu : ${objet}`);
+    if (!item) throw new Error(`objet inconnu : ${args.objet} (utilise l'identifiant Minecraft anglais, ex. oak_planks, crafting_table, wooden_pickaxe)`);
     let table = null;
     let recipe = bot.recipesFor(item.id, null, 1, null)[0];
     if (!recipe) {
@@ -492,6 +494,28 @@ async function patienter(bot, ms) {
   while (Date.now() < fin && !bot.interrompre) await sleep(250);
 }
 
+// Le modèle écrit parfois l'objet en français ou sans l'essence de bois ("planches", "planks", "table de craft") :
+// on le traduit en identifiant Minecraft au lieu de répondre "objet inconnu" (7 fois de suite dans un test).
+const ALIAS = {
+  planches: 'planks', planche: 'planks', bois: 'log', buches: 'log', 'bûches': 'log', 'bûche': 'log', buche: 'log',
+  'table de craft': 'crafting_table', 'établi': 'crafting_table', etabli: 'crafting_table', 'table de travail': 'crafting_table',
+  'bâton': 'stick', 'bâtons': 'stick', baton: 'stick', batons: 'stick', sticks: 'stick',
+  pioche: 'wooden_pickaxe', hache: 'wooden_axe', 'épée': 'wooden_sword', pelle: 'wooden_shovel',
+  four: 'furnace', coffre: 'chest', torche: 'torch', torches: 'torch',
+};
+
+function nomObjet(bot, mcData, objet) {
+  let nom = String(objet).toLowerCase().trim();
+  nom = ALIAS[nom] || nom.replace(/ /g, '_');
+  if (mcData.itemsByName[nom]) return nom;
+  // "planks" ou "log" sans essence : on prend l'essence de bois que le bot possède.
+  if (nom === 'planks' || nom === 'log') {
+    const bois = bot.inventory.items().find((i) => i.name.endsWith('_log'));
+    return `${bois ? bois.name.replace('_log', '') : 'oak'}_${nom}`;
+  }
+  return nom;
+}
+
 function findItem(bot, name) {
   const item = bot.inventory.items().find((i) => i.name === name);
   if (!item) throw new Error(`tu n'as pas de ${name}`);
@@ -526,4 +550,4 @@ async function execute(bot, name, args, ctx, timeoutMs) {
   }
 }
 
-module.exports = { TOOLS, executors, execute, checkArgs, resolveBlocks };
+module.exports = { TOOLS, executors, execute, checkArgs, resolveBlocks, nomObjet };

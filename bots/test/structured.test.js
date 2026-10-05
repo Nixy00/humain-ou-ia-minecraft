@@ -319,3 +319,14 @@ test('chasser : sans animal proche, le bot est invité à explorer', async () =>
   const { executors } = require('../src/agent/actions');
   await assert.rejects(executors.chasser({ nearestEntity: () => null }, {}, { style: { rateCoup: 0 } }), /explore/);
 });
+
+test('noms d\'objets approximatifs traduits en identifiants Minecraft', () => {
+  const { nomObjet } = require('../src/agent/actions');
+  const mcData = require('minecraft-data')('1.20.4');
+  const bot = { inventory: { items: () => [{ name: 'birch_log', count: 4 }] } };
+  assert.strictEqual(nomObjet(bot, mcData, 'planches'), 'birch_planks');
+  assert.strictEqual(nomObjet(bot, mcData, 'planks'), 'birch_planks');
+  assert.strictEqual(nomObjet(bot, mcData, 'table de craft'), 'crafting_table');
+  assert.strictEqual(nomObjet(bot, mcData, 'Bâtons'), 'stick');
+  assert.strictEqual(nomObjet(bot, mcData, 'wooden_pickaxe'), 'wooden_pickaxe');
+});
