@@ -50,7 +50,9 @@ export async function craftRecipe(bot, itemName, num=1) {
     }
 
     // get recipes that don't require a crafting table
-    let recipes = bot.recipesFor(mc.getItemId(itemName), null, 1, null); 
+    // Modif SAE : avec notre version de mineflayer, recipesFor(..., null) renvoie aussi des recettes
+    // qui demandent une table ("Recipe requires craftingTable, but one was not supplied").
+    let recipes = bot.recipesFor(mc.getItemId(itemName), null, 1, null).filter((r) => !r.requiresTable);
     let craftingTable = null;
     const craftingTableRange = 16;
     placeTable: if (!recipes || recipes.length === 0) {

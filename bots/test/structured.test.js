@@ -536,3 +536,14 @@ test('repetition : meme idee avec d autres mots, ou question restee sans reponse
   a.memory.chat.push({ from: 'Joueur5', text: 'nan', t: Date.now() });
   assert.deepStrictEqual(a.verifierRepetition('parler', { message: 'tu veux du charbon ?' }), []);
 });
+
+test('fabriquer sans table posee : une recette qui demande une table passe par la table', async () => {
+  const { executors } = require('../src/agent/actions');
+  const mcData = require('minecraft-data')('1.20.4');
+  const appels = [];
+  const recette = { requiresTable: true, inShape: [[{ id: mcData.itemsByName.cobblestone.id, count: 1 }]] };
+  const bot = { version: '1.20.4', registry: mcData, inventory: { items: () => [], slots: [] },
+    recipesFor: (id, m, n, table) => (table === null ? [recette] : []), craft: async (r, n, t) => appels.push(t) };
+  await assert.rejects(executors.fabriquer(bot, { objet: 'stone_axe', quantite: 1 }));
+  assert.deepStrictEqual(appels, []); // avant : bot.craft(recette avec table, sans table) -> erreur
+});
