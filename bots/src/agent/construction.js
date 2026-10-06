@@ -4,7 +4,6 @@ const { Vec3 } = require('vec3');
 
 const TAILLE = 5; // cabane de 5 x 5, intérieur de 3 x 3
 const HAUTEUR = 3; // murs de 3 blocs, puis le toit
-const VIDES = ['air', 'cave_air', 'grass', 'short_grass', 'tall_grass', 'fern', 'snow', 'dead_bush'];
 
 // Liste des blocs à poser, dans l'ordre : les murs rangée par rangée (en partant du bas),
 // puis le toit du bord vers le centre (chaque bloc du toit doit toucher un bloc déjà posé).
@@ -30,26 +29,44 @@ function plansCabane(origine) {
   return blocs.concat(toit.map(({ pos, partie }) => ({ pos, partie })));
 }
 
+// Vide = on peut poser à cet endroit : air, herbe, fleurs... (blocs qu'on traverse).
 function vide(bot, pos) {
   const b = bot.blockAt(pos);
-  return Boolean(b) && VIDES.includes(b.name);
+  return Boolean(b) && b.boundingBox === 'empty' && !b.name.includes('water') && !b.name.includes('lava');
 }
 
-// Un endroit plat et dégagé de 5 x 5 près du bot (pas sur lui, pour ne pas s'emmurer).
+function solide(bot, pos) {
+  const b = bot.blockAt(pos);
+  return Boolean(b) && b.boundingBox === 'block' && !b.name.includes('leaves');
+}
+
+// Un terrain de 5 x 5 dégagé près du bot, pas sur lui (pour ne pas s'emmurer).
+// Le sol peut avoir un creux d'un bloc : autour du spawn c'est montagneux et rien n'est parfaitement plat.
+function terrainOk(bot, origine) {
+  for (let x = 0; x < TAILLE; x++) {
+    for (let z = 0; z < TAILLE; z++) {
+      const sol = origine.offset(x, -1, z);
+      if (!solide(bot, sol) && !(vide(bot, sol) && solide(bot, sol.offset(0, -1, 0)))) return false;
+      for (let y = 0; y <= HAUTEUR; y++) if (!vide(bot, origine.offset(x, y, z))) return false;
+    }
+  }
+  return true;
+}
+
 function trouverTerrain(bot) {
   const p = bot.entity.position.floored();
-  for (let r = 2; r <= 12; r++) {
-    for (const [dx, dz] of [[r, 0], [-r - TAILLE + 1, 0], [0, r], [0, -r - TAILLE + 1]]) {
-      const origine = p.offset(dx, 0, dz);
-      let ok = true;
-      for (let x = 0; x < TAILLE && ok; x++) {
-        for (let z = 0; z < TAILLE && ok; z++) {
-          const sol = bot.blockAt(origine.offset(x, -1, z));
-          if (!sol || VIDES.includes(sol.name) || sol.name.includes('water') || sol.name.includes('leaves')) ok = false;
-          for (let y = 0; y <= HAUTEUR && ok; y++) if (!vide(bot, origine.offset(x, y, z))) ok = false;
-        }
-      }
-      if (ok) return origine;
+  const essais = [];
+  for (let dx = -14; dx <= 10; dx++) {
+    for (let dz = -14; dz <= 10; dz++) {
+      const surLui = dx <= 0 && dx > -TAILLE && dz <= 0 && dz > -TAILLE;
+      if (!surLui) essais.push([dx, dz, Math.abs(dx + 2) + Math.abs(dz + 2)]);
+    }
+  }
+  essais.sort((a, b) => a[2] - b[2]); // les plus proches d'abord
+  for (const [dx, dz] of essais) {
+    for (const dy of [0, -1, 1, -2, 2]) {
+      const origine = p.offset(dx, dy, dz);
+      if (terrainOk(bot, origine)) return origine;
     }
   }
   return null;
