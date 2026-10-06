@@ -35,7 +35,7 @@ Façon de jouer :
 - Ne prétends pas avoir des objets absents de ton inventaire. Si une action échoue, adapte-toi.
 - Champs des outils : joueur = pseudo exact ; bloc, objet = identifiant Minecraft en anglais (oak_log, stick, cobblestone) ; x, y, z = coordonnées entières ; objectif (optionnel) = ton objectif actuel en quelques mots ; note (optionnel) = une chose à retenir (ton carnet) ; promesse (optionnel) = ce que tu as promis de faire plus tard et pour qui. Dans les outils, toujours l'identifiant anglais (oak_planks, crafting_table), même si dans le chat tu dis "planches" ou "table de craft".
 - Au début tu n'as rien : coupe du bois (oak_log), fais des planches, une table de craft (crafting_table), des bâtons, puis une pioche en bois. Sans pioche tu ne peux pas miner la pierre ni le charbon.
-- Pour construire, pose les blocs un par un avec des coordonnées proches de ta position (ex. x+1, même y, même z).
+- Pour une cabane, utilise l'outil construire (il pose tout seul les murs et le toit, relance-le pour continuer). poser_bloc sert pour un bloc précis.
 
 À chaque tour, choisis exactement UN outil.`;
 }

@@ -71,14 +71,7 @@
     "objectifs": [
       "stone_axe",
       "stone_pickaxe",
-      {
-        "objet": "oak_planks",
-        "nombre": 64
-      },
-      {
-        "objet": "cobblestone",
-        "nombre": 64
-      }
+      "cabane"
     ],
     "caractere": {
       "serviable": 0.5,

@@ -11,6 +11,7 @@ const { systemPrompt, turnPrompt, votePrompt } = require('./prompt');
 const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, delaiAvantAction, uniform } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
 const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
+const { NB_BLOCS } = require('./construction');
 const { callTool } = require('../llm/structured');
 
 const HUMEURS = ['motivé', 'normal', 'normal', 'un peu fatigué', 'de bonne humeur'];
@@ -325,8 +326,16 @@ class Agent {
     const mission = objetDeMission(this.memory.mission, this.mcData);
     // Mission finie : on le lui dit (sinon il refabriquait un deuxième casque avec ses diamants).
     if (mission) return prochaineEtape(mission, inv, this.recettes) || `aucune, mission accomplie (tu as ${mission}) : ne le refabrique pas, fais ce que tu veux`;
-    const but = objectifDuMoment(this.objectifs, inv);
-    return but ? prochaineEtape(but.objet, inv, this.recettes, but.nombre) : null;
+    const but = objectifDuMoment(this.objectifs.filter((o) => !(o === 'cabane' && bot.cabaneFinie)), inv);
+    if (!but) return null;
+    if (but.objet === 'cabane') {
+      // Assez de blocs pour ce qu'il reste à poser ? Sinon l'étape est d'aller en chercher.
+      const reste = bot.chantier ? bot.chantier.restants.length : NB_BLOCS;
+      const pierre = inv.filter((i) => i.name === 'cobblestone').reduce((s, i) => s + i.count, 0);
+      const planches = reste - pierre;
+      return (planches > 0 && prochaineEtape('oak_planks', inv, this.recettes, planches)) || 'construire (ta cabane)';
+    }
+    return prochaineEtape(but.objet, inv, this.recettes, but.nombre);
   }
 
   // Après une décision : une demande d'un joueur en attente passe d'abord.

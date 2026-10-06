@@ -477,3 +477,28 @@ test('profils : l etape suit le premier objectif pas encore atteint', async () =
   assert.strictEqual(a.etapeDuMoment(bot({ stone_sword: 1, stone_pickaxe: 1, iron_ingot: 1, stick: 4, crafting_table: 1 })), 'collecter iron_ore (1), creuser vers y=16 ou chercher une grotte');
   assert.strictEqual(a.etapeDuMoment(bot({ stone_sword: 1, stone_pickaxe: 1, iron_ingot: 2, stick: 4, crafting_table: 1 })), 'fabriquer iron_sword');
 });
+
+test('cabane : murs avec une porte, toit du bord vers le centre', () => {
+  const { plansCabane, NB_BLOCS } = require('../src/agent/construction');
+  const { Vec3 } = require('vec3');
+  const plans = plansCabane(new Vec3(10, 64, 20));
+  assert.strictEqual(NB_BLOCS, 16 * 3 - 2 + 25);
+  assert.ok(!plans.some((b) => b.pos.equals(new Vec3(12, 64, 20)))); // la porte reste vide
+  const toit = plans.filter((b) => b.partie === 'toit');
+  assert.ok(plans.indexOf(toit[0]) > plans.filter((b) => b.partie === 'mur').length - 1); // murs d'abord
+  assert.ok(toit[toit.length - 1].pos.equals(new Vec3(12, 67, 22))); // le centre du toit en dernier
+});
+
+test('builder : il va chercher des planches avant de construire', async () => {
+  const { Agent } = require('../src/agent/agent');
+  const mc = await import('../src/mindcraft/mcdata.mjs');
+  mc.init('1.20.4');
+  const profil = require('../agents.json').find((p) => p.username === 'Joueur6');
+  const a = new Agent(profil, { cfg: { agent: { mission: '' } }, gateway: {}, logger: {} });
+  a.recettes = mc.getItemCraftingRecipes;
+  a.mcData = require('minecraft-data')('1.20.4');
+  const bot = (inv) => ({ inventory: { items: () => Object.entries(inv).map(([name, count]) => ({ name, count })) } });
+  const outils = { stone_axe: 1, stone_pickaxe: 1 };
+  assert.match(a.etapeDuMoment(bot({ ...outils, cobblestone: 40 })), /^collecter oak_log/);
+  assert.strictEqual(a.etapeDuMoment(bot({ ...outils, cobblestone: 46, oak_planks: 30 })), 'construire (ta cabane)');
+});

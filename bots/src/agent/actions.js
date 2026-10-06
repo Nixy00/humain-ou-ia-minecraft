@@ -10,6 +10,7 @@ const { goals } = require('mineflayer-pathfinder');
 const { Vec3 } = require('vec3');
 const { isHostile, ANIMAUX } = require('./perception');
 const { frapper, delaiEntreCoups } = require('./humanizer');
+const { plansCabane, trouverTerrain, choisirBloc, vide } = require('./construction');
 
 // Champs communs. Leurs explications sont dans la consigne système (prompt.js) et pas ici :
 // répétées dans les 23 outils, elles faisaient 40 % de la taille de chaque requête.
@@ -55,6 +56,7 @@ const TOOLS = [
   tool('fuir', 'S\'éloigner du monstre le plus proche.', {}),
   tool('creuser', 'Creuser droit vers le bas (pour descendre vers les minerais : fer vers y=16, diamant vers y=-58).', { blocs: { type: 'integer', minimum: 1, maximum: 20 } }, ['blocs']),
   tool('remonter', 'Remonter à la surface.', {}),
+  tool('construire', 'Construire une cabane de 5x5 près de toi (environ 70 blocs : cobblestone ou planches). Relance-la pour continuer le chantier.', {}),
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -272,6 +274,44 @@ const executors = {
 
   async creuser(bot, { blocs }) {
     return mindcraft(bot, 'digDown', blocs);
+  },
+
+  async construire(bot) {
+    // Le chantier est gardé sur le bot : on reprend là où on s'était arrêté.
+    if (!bot.chantier) {
+      const origine = trouverTerrain(bot);
+      if (!origine) throw new Error("pas d'endroit plat et dégagé de 5x5 ici, va un peu plus loin");
+      bot.chantier = { origine, restants: plansCabane(origine) };
+    }
+    const c = bot.chantier;
+    let poses = 0;
+    const fin = Date.now() + 45000; // on rend la main avant la limite de 60 s d'une action
+    while (c.restants.length > 0 && Date.now() < fin && !bot.interrompre) {
+      const b = c.restants[0];
+      if (!vide(bot, b.pos)) { // déjà posé (ou un bloc naturel qui fait l'affaire)
+        c.restants.shift();
+        continue;
+      }
+      const bloc = choisirBloc(bot, b.partie);
+      if (!bloc) throw new Error(`il te manque des blocs pour ${b.partie === 'toit' ? 'le toit' : 'les murs'} (planches ou cobblestone), encore ${c.restants.length} à poser`);
+      try {
+        await mindcraft(bot, 'placeBlock', bloc.name, b.pos.x, b.pos.y, b.pos.z);
+        poses++;
+        c.restants.shift();
+      } catch {
+        // Bloc impossible à poser pour l'instant : on le remet à la fin, 3 essais maximum.
+        b.essais = (b.essais || 0) + 1;
+        c.restants.shift();
+        if (b.essais < 3) c.restants.push(b);
+      }
+    }
+    const o = c.origine;
+    if (c.restants.length === 0) {
+      bot.chantier = null;
+      bot.cabaneFinie = true;
+      return `cabane finie en ${o.x} ${o.z} (${poses} blocs posés cette fois)`;
+    }
+    return `cabane en ${o.x} ${o.z} : ${poses} blocs posés, encore ${c.restants.length} (relance construire)`;
   },
 
   async remonter(bot) {
