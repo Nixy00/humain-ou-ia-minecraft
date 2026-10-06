@@ -18,9 +18,9 @@ function extractJson(text) {
   }
 }
 
-// Les limites (maxLength, minimum...) sont vérifiées par notre code (schema.js) après la réponse :
-// inutile de les envoyer au modèle, elles faisaient environ 1/3 des tokens de chaque requête.
-const LIMITES = ['maxLength', 'minLength', 'minimum', 'maximum'];
+// Les longueurs de texte sont vérifiées par notre code (schema.js) après la réponse : inutile de les envoyer.
+// On garde minimum et maximum des nombres : sans eux il demandait 20 objets et se faisait refuser.
+const LIMITES = ['maxLength', 'minLength'];
 function alleger(schema) {
   const copie = {};
   for (const [cle, val] of Object.entries(schema)) {

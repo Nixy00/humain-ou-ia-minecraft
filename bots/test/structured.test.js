@@ -547,3 +547,15 @@ test('fabriquer sans table posee : une recette qui demande une table passe par l
   await assert.rejects(executors.fabriquer(bot, { objet: 'stone_axe', quantite: 1 }));
   assert.deepStrictEqual(appels, []); // avant : bot.craft(recette avec table, sans table) -> erreur
 });
+
+test('outils proposes : pas de manger sans nourriture, pas de chat seul, pas de coffre sans coffre', () => {
+  const { outilsUtiles } = require('../src/agent/actions');
+  const { Vec3 } = require('vec3');
+  const bot = { entity: { position: new Vec3(0, 64, 0) }, players: { Joueur6: {} }, registry: require('minecraft-data')('1.20.4'),
+    inventory: { items: () => [] }, findBlock: () => null, nearestEntity: () => null, time: { timeOfDay: 1000 } };
+  const noms = outilsUtiles(bot).map((t) => t.name);
+  for (const absent of ['manger', 'parler', 'voir_coffre', 'fuir', 'dormir', 'remonter']) assert.ok(!noms.includes(absent), absent);
+  assert.ok(noms.includes('collecter') && noms.includes('construire'));
+  bot.inventory.items = () => [{ name: 'beef', count: 1 }];
+  assert.ok(outilsUtiles(bot).some((t) => t.name === 'manger'));
+});

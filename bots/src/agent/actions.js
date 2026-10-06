@@ -420,8 +420,11 @@ function outilsUtiles(bot) {
   const monstre = bot.nearestEntity((e) => isHostile(e) && pos.distanceTo(e.position) < 16);
   const tod = bot.time.timeOfDay;
   const nuit = tod >= 12300 && tod <= 23850;
+  // Affamé, il redemandait "manger" 45 fois malgré le refus (un appel payé à chaque fois) : on ne le propose plus.
+  const aManger = bot.inventory.items().some((i) => bot.registry.foodsByName[i.name]);
   return TOOLS.filter((t) => !(
-    (!autres && OUTILS_JOUEURS.includes(t.name))
+    (!aManger && t.name === 'manger')
+    || (!autres && OUTILS_JOUEURS.includes(t.name))
     || (!coffre && OUTILS_COFFRE.includes(t.name))
     || (!monstre && OUTILS_COMBAT.includes(t.name))
     || (!nuit && t.name === 'dormir')
