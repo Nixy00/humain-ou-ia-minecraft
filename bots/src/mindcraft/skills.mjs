@@ -100,7 +100,12 @@ export async function craftRecipe(bot, itemName, num=1) {
     const requiredIngredients = mc.ingredientsFromPrismarineRecipe(recipe); //Items required to use the recipe once.
     const craftLimit = mc.calculateLimitingResource(inventory, requiredIngredients);
     
-    await bot.craft(recipe, Math.min(craftLimit.num, num), craftingTable);
+    // Modif SAE : une fabrication a la fois. bot.craft(recipe, n) avec n > 1 desynchronise
+    // l'inventaire sur notre serveur Paper (un bouton en bois apparait, puis "updateSlot:0 did not fire").
+    for (let i = 0; i < Math.min(craftLimit.num, num); i++) {
+        await bot.craft(recipe, 1, craftingTable);
+        await new Promise((r) => setTimeout(r, 150));
+    }
     if(craftLimit.num<num) log(bot, `Not enough ${craftLimit.limitingResource} to craft ${num}, crafted ${craftLimit.num}. You now have ${world.getInventoryCounts(bot)[itemName]} ${itemName}.`);
     else log(bot, `Successfully crafted ${itemName}, you now have ${world.getInventoryCounts(bot)[itemName]} ${itemName}.`);
     if (placedTable) {

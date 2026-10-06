@@ -430,3 +430,15 @@ test('enchainement : relance apres une action, la demande d un joueur passe avan
   a.suite(null); // decision ratee : pas de relance (sinon boucle si la passerelle est en panne)
   assert.strictEqual(appels.length, 2);
 });
+
+test('fabriquer plusieurs objets : une fabrication a la fois (bug d inventaire sur Paper)', async () => {
+  const { executors } = require('../src/agent/actions');
+  const mcData = require('minecraft-data')('1.20.4');
+  const appels = [];
+  const recette = { inShape: [[{ id: mcData.itemsByName.oak_planks.id, count: 1 }], [{ id: mcData.itemsByName.oak_planks.id, count: 1 }]] };
+  const planches = { name: 'oak_planks', count: 8 };
+  const bot = { version: '1.20.4', registry: mcData, inventory: { items: () => [planches], slots: [planches] },
+    recipesFor: () => [recette], craft: async (r, n) => appels.push(n), armorManager: { equipAll() {} } };
+  await executors.fabriquer(bot, { objet: 'stick', quantite: 4 });
+  assert.deepStrictEqual(appels, [1, 1, 1, 1]);
+});
