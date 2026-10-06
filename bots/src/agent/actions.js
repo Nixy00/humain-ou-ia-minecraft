@@ -423,8 +423,13 @@ function outilsUtiles(bot) {
   const nuit = tod >= 12300 && tod <= 23850;
   // Affamé, il redemandait "manger" 45 fois malgré le refus (un appel payé à chaque fois) : on ne le propose plus.
   const aManger = bot.inventory.items().some((i) => bot.registry.foodsByName[i.name]);
+  // chasser échouait 84 % du temps (aucun animal autour), construire 88 % (plus de blocs) : on ne les propose plus dans ces cas.
+  const animal = bot.nearestEntity((e) => ANIMAUX.includes(e.name) && pos.distanceTo(e.position) < 48);
+  const blocs = bot.inventory.items().some((i) => i.name === 'cobblestone' || i.name.endsWith('_planks'));
   return TOOLS.filter((t) => !(
     (!aManger && t.name === 'manger')
+    || (!animal && t.name === 'chasser')
+    || (!blocs && t.name === 'construire')
     || (!autres && OUTILS_JOUEURS.includes(t.name))
     || (!coffre && OUTILS_COFFRE.includes(t.name))
     || (!monstre && OUTILS_COMBAT.includes(t.name))

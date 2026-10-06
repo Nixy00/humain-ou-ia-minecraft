@@ -44,6 +44,26 @@ function nearbyBlocks(bot, mcData, radius = 16) {
   return entries.length ? entries.map(([n, g]) => `${n} (${g.count}, le plus proche à ${round(g.nearest)} blocs)`).join(', ') : 'rien de notable';
 }
 
+// Objets utiles qu'on vérifie (tous les objets du jeu, c'est 1 300 recettes à chaque décision et beaucoup de bruit).
+const A_FABRIQUER = ['crafting_table', 'stick', 'torch', 'furnace', 'chest', 'white_bed', 'bucket', 'shield', 'ladder', 'oak_door',
+  'wooden_pickaxe', 'stone_pickaxe', 'iron_pickaxe', 'diamond_pickaxe', 'wooden_axe', 'stone_axe', 'iron_axe',
+  'wooden_sword', 'stone_sword', 'iron_sword', 'diamond_sword', 'stone_shovel', 'iron_shovel',
+  'iron_helmet', 'iron_chestplate', 'iron_leggings', 'iron_boots', 'diamond_helmet', 'diamond_chestplate', 'diamond_leggings', 'diamond_boots',
+  'iron_block', 'diamond_block', 'bread'];
+
+// Ce qu'il peut fabriquer tout de suite : il devinait les recettes et 39 % de ses "fabriquer" échouaient.
+function fabricables(bot) {
+  const table = bot.inventory.items().some((i) => i.name === 'crafting_table')
+    || Boolean(bot.findBlock({ matching: bot.registry.blocksByName.crafting_table.id, maxDistance: 16 }));
+  const noms = [...A_FABRIQUER];
+  for (const i of bot.inventory.items()) if (i.name.endsWith('_log') && !i.name.startsWith('stripped')) noms.push(i.name.replace('_log', '_planks'));
+  return [...new Set(noms)].filter((nom) => {
+    const item = bot.registry.itemsByName[nom];
+    // Sans table, recipesFor renvoie aussi les recettes qui en demandent une : on les enlève.
+    return item && bot.recipesFor(item.id, null, 1, table || null).some((r) => table || !r.requiresTable);
+  });
+}
+
 function observe(bot, mcData, memory) {
   const me = bot.entity.position;
   const others = Object.values(bot.players).filter((p) => p.username !== bot.username);
@@ -110,6 +130,10 @@ function observe(bot, mcData, memory) {
       : "tu as faim et rien à manger, aucun animal en vue : explorer pour en trouver (ils sont souvent en bas, dans les plaines)");
   }
   if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
+  if (bot.recipesFor) {
+    const f = fabricables(bot);
+    lines.push(`Tu peux fabriquer maintenant : ${f.length ? f.join(', ') : "rien d'utile"}.`);
+  }
   if (memory.envie) lines.push(`Ce que tu as envie de faire dans cette partie : ${memory.envie}`);
   if (memory.mission) lines.push(`Ta mission : ${memory.mission}`);
   // Toujours affichée : c'est le bot qui choisit entre son étape et une demande (selon son caractère).

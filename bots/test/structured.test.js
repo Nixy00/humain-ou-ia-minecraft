@@ -554,10 +554,12 @@ test('outils proposes : pas de manger sans nourriture, pas de chat seul, pas de 
   const bot = { entity: { position: new Vec3(0, 64, 0) }, players: { Joueur6: {} }, registry: require('minecraft-data')('1.20.4'),
     inventory: { items: () => [] }, findBlock: () => null, nearestEntity: () => null, time: { timeOfDay: 1000 } };
   const noms = outilsUtiles(bot).map((t) => t.name);
-  for (const absent of ['manger', 'parler', 'voir_coffre', 'fuir', 'dormir', 'remonter']) assert.ok(!noms.includes(absent), absent);
-  assert.ok(noms.includes('collecter') && noms.includes('construire'));
-  bot.inventory.items = () => [{ name: 'beef', count: 1 }];
-  assert.ok(outilsUtiles(bot).some((t) => t.name === 'manger'));
+  for (const absent of ['manger', 'parler', 'voir_coffre', 'fuir', 'dormir', 'remonter', 'chasser', 'construire']) assert.ok(!noms.includes(absent), absent);
+  assert.ok(noms.includes('collecter'));
+  bot.inventory.items = () => [{ name: 'beef', count: 1 }, { name: 'cobblestone', count: 40 }];
+  bot.nearestEntity = (f) => [{ name: 'cow', position: new Vec3(5, 64, 0) }].find(f);
+  const avec = outilsUtiles(bot).map((t) => t.name);
+  for (const present of ['manger', 'construire', 'chasser']) assert.ok(avec.includes(present), present);
 });
 
 test('meme action ratee 2 fois : la 3e est refusee ; message a tout le monde = pour moi', () => {
@@ -586,4 +588,16 @@ test('demande a tout le monde : le bot a qui ca coute le moins reagit en premier
   const t = Date.now();
   assert.ok(dejaRepondu([{ from: 'Joueur4', text: 'jen ai tiens', t: t + 3000 }], 'SAHYGO', t, 'Joueur5'));
   assert.ok(!dejaRepondu([{ from: 'SAHYGO', text: 'allo ?', t: t + 3000 }], 'SAHYGO', t, 'Joueur5'));
+});
+
+test('perception : liste de ce qu il peut fabriquer tout de suite', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const registry = require('minecraft-data')('1.20.4');
+  const inv = [{ name: 'oak_log', count: 2 }];
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20, registry,
+    inventory: { items: () => inv }, findBlocks: () => [], findBlock: () => null, time: { timeOfDay: 1000 },
+    recipesFor: (id) => (id === registry.itemsByName.oak_planks.id ? [{ requiresTable: false }] : [{ requiresTable: true }]) };
+  const texte = observe(bot, { blocksArray: [] }, { events: [], chat: [], actions: [], notes: [], demandes: [] });
+  assert.match(texte, /Tu peux fabriquer maintenant : oak_planks\./);
 });
