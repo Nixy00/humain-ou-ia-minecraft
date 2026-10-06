@@ -14,7 +14,6 @@ const { plansCabane, trouverTerrain, choisirBloc, vide } = require('./constructi
 
 // Champs communs. Leurs explications sont dans la consigne système (prompt.js) et pas ici :
 // répétées dans les 23 outils, elles faisaient 40 % de la taille de chaque requête.
-const OBJECTIF = { type: 'string', maxLength: 120 };
 const NOTE = { type: 'string', maxLength: 120 };
 const PROMESSE = { type: 'string', maxLength: 120 };
 const JOUEUR = { type: 'string', maxLength: 32 };
@@ -25,7 +24,7 @@ function tool(name, description, properties, required = []) {
   return {
     name,
     description,
-    parameters: { type: 'object', properties: { ...properties, objectif: OBJECTIF, note: NOTE, promesse: PROMESSE }, required },
+    parameters: { type: 'object', properties: { ...properties, note: NOTE, promesse: PROMESSE }, required },
   };
 }
 
@@ -408,4 +407,26 @@ async function execute(bot, name, args, ctx, timeoutMs) {
   }
 }
 
-module.exports = { TOOLS, executors, execute, checkArgs, nomObjet };
+// On n'envoie au modèle que les outils qui servent dans la situation (moins de tokens par appel) :
+// pas de chat sans autre joueur, pas de coffre sans coffre proche, pas de combat sans monstre...
+const OUTILS_JOUEURS = ['parler', 'murmurer', 'aller_vers_joueur', 'suivre_joueur', 'regarder_joueur', 'donner'];
+const OUTILS_COFFRE = ['voir_coffre', 'prendre_coffre', 'deposer_coffre'];
+const OUTILS_COMBAT = ['se_defendre', 'fuir'];
+
+function outilsUtiles(bot) {
+  const pos = bot.entity.position;
+  const autres = Object.keys(bot.players).length > 1;
+  const coffre = bot.findBlock({ matching: bot.registry.blocksByName.chest.id, maxDistance: 32 });
+  const monstre = bot.nearestEntity((e) => isHostile(e) && pos.distanceTo(e.position) < 16);
+  const tod = bot.time.timeOfDay;
+  const nuit = tod >= 12300 && tod <= 23850;
+  return TOOLS.filter((t) => !(
+    (!autres && OUTILS_JOUEURS.includes(t.name))
+    || (!coffre && OUTILS_COFFRE.includes(t.name))
+    || (!monstre && OUTILS_COMBAT.includes(t.name))
+    || (!nuit && t.name === 'dormir')
+    || (pos.y >= 50 && t.name === 'remonter')
+  ));
+}
+
+module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles };

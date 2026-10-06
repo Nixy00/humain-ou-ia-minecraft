@@ -6,7 +6,7 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 const minecraftData = require('minecraft-data');
 
 const { observe } = require('./perception');
-const { TOOLS, execute, checkArgs } = require('./actions');
+const { execute, checkArgs, outilsUtiles } = require('./actions');
 const { systemPrompt, turnPrompt, votePrompt } = require('./prompt');
 const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, delaiAvantAction, uniform } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
@@ -32,7 +32,7 @@ class Agent {
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], promesses: [], objectif: null, envie: envie || '', mission: cfg.agent ? cfg.agent.mission : '' };
+    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], promesses: [], envie: envie || '', mission: cfg.agent ? cfg.agent.mission : '' };
     this.seq = 0;
     this.busy = false;
     this.pendingReason = null;
@@ -237,7 +237,7 @@ class Agent {
           { role: 'system', content: systemPrompt(this.username, this.persona, this.caractere, this.humeur) },
           { role: 'user', content: turnPrompt(observation, reason) },
         ],
-        tools: TOOLS,
+        tools: outilsUtiles(bot),
         meta: { agent: this.username, decisionId, kind: 'decision' },
         extraCheck: (name, args) => [...checkArgs(this.bot, name, args), ...this.verifierRepetition(name, args)],
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
@@ -248,14 +248,13 @@ class Agent {
         this.logger.write('decisions', { agent: this.username, decision_id: decisionId, reason, ok: false, llm_ms: llmMs });
         return;
       }
-      const { objectif, note, promesse, ...args } = choice.args;
+      const { note, promesse, ...args } = choice.args;
       // Promesse ("jfinis ma cabane et jtaide") : il la voit pendant 20 min pour y revenir plus tard.
       if (promesse) {
         this.memory.promesses.push({ text: promesse, t: Date.now() });
         if (this.memory.promesses.length > 3) this.memory.promesses.shift();
         this.logger.write('notes', { agent: this.username, decision_id: decisionId, promesse });
       }
-      if (objectif) this.memory.objectif = objectif;
       // Carnet de notes : l'IA garde ce qu'elle veut retenir (10 dernières notes),
       // et tout est enregistré dans notes.jsonl pour l'analyse.
       if (note) {
@@ -265,7 +264,7 @@ class Agent {
       }
       this.logger.write('decisions', {
         agent: this.username, decision_id: decisionId, reason, ok: true,
-        tool: choice.name, args, objectif: objectif ?? null, llm_call_ids: choice.callIds, llm_ms: llmMs,
+        tool: choice.name, args, llm_call_ids: choice.callIds, llm_ms: llmMs,
       });
 
       let delay = 0;

@@ -510,3 +510,17 @@ test('manger sans nourriture : refuse avant d agir, conseil de chasser', () => {
   bot.inventory.items = () => [{ name: 'beef', count: 1 }];
   assert.deepStrictEqual(checkArgs(bot, 'manger', {}), []);
 });
+
+test('perception : evenements identiques regroupes, notes en double affichees une fois', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const t = Date.now();
+  const fuite = { type: 'reflexe', text: 'fuite : skeleton, vie 6', t };
+  const memory = { events: [fuite, fuite, fuite], chat: [], actions: [], notes: [{ text: 'miner pierre', t }, { text: 'miner pierre', t }], demandes: [] };
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+  const texte = observe(bot, { blocksArray: [] }, memory);
+  assert.strictEqual(texte.split('fuite : skeleton').length, 2);
+  assert.ok(texte.includes('(x3)'));
+  assert.strictEqual(texte.split('miner pierre').length, 2);
+});

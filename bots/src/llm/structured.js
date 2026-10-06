@@ -18,10 +18,23 @@ function extractJson(text) {
   }
 }
 
+// Les limites (maxLength, minimum...) sont vérifiées par notre code (schema.js) après la réponse :
+// inutile de les envoyer au modèle, elles faisaient environ 1/3 des tokens de chaque requête.
+const LIMITES = ['maxLength', 'minLength', 'minimum', 'maximum'];
+function alleger(schema) {
+  const copie = {};
+  for (const [cle, val] of Object.entries(schema)) {
+    if (LIMITES.includes(cle)) continue;
+    if (cle === 'properties') copie[cle] = Object.fromEntries(Object.entries(val).map(([k, v]) => [k, alleger(v)]));
+    else copie[cle] = val;
+  }
+  return copie;
+}
+
 function toOpenAiTools(tools) {
   return tools.map((t) => ({
     type: 'function',
-    function: { name: t.name, description: t.description, parameters: t.parameters },
+    function: { name: t.name, description: t.description, parameters: alleger(t.parameters) },
   }));
 }
 
@@ -148,4 +161,4 @@ async function callTool({ gateway, logger, messages, tools, meta, extraCheck, ma
   return null;
 }
 
-module.exports = { callTool, extractJson, parseResponse };
+module.exports = { callTool, extractJson, parseResponse, toOpenAiTools };

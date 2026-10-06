@@ -114,7 +114,6 @@ function observe(bot, mcData, memory) {
   if (memory.mission) lines.push(`Ta mission : ${memory.mission}`);
   // Toujours affichée : c'est le bot qui choisit entre son étape et une demande (selon son caractère).
   if (memory.etape) lines.push(`Prochaine étape pour avancer (calculée pour toi) : ${memory.etape}`);
-  if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {
     lines.push('', "Ce qu'on t'a demandé récemment (à toi de voir selon ton caractère et ce que tu fais : maintenant, plus tard ou non) :");
@@ -127,7 +126,9 @@ function observe(bot, mcData, memory) {
   }
   if (memory.notes.length > 0) {
     lines.push('', 'Ton carnet (ce que tu as noté pour t\'en souvenir) :');
-    for (const n of memory.notes) lines.push(`- [${agoText(n.t)}] ${n.text}`);
+    // Il notait souvent deux fois la même chose : on n'affiche que la dernière.
+    const notes = memory.notes.filter((n, i) => !memory.notes.slice(i + 1).some((m) => m.text === n.text));
+    for (const n of notes) lines.push(`- [${agoText(n.t)}] ${n.text}`);
   }
 
   // Le chat est affiché comme une vraie conversation : les messages des autres et les tiens, dans l'ordre.
@@ -142,7 +143,16 @@ function observe(bot, mcData, memory) {
 
   lines.push('', 'Autres évènements récents :');
   if (memory.events.length === 0) lines.push('- aucun');
-  for (const e of memory.events) lines.push(`- [${e.type}, ${agoText(e.t)}] ${e.text}`);
+  // Évènements identiques à la suite regroupés : la fuite devant un squelette apparaissait 12 fois.
+  const groupes = [];
+  for (const e of memory.events) {
+    const dernier = groupes[groupes.length - 1];
+    if (dernier && dernier.type === e.type && dernier.text === e.text) {
+      dernier.fois++;
+      dernier.t = e.t;
+    } else groupes.push({ ...e, fois: 1 });
+  }
+  for (const e of groupes) lines.push(`- [${e.type}, ${agoText(e.t)}] ${e.text}${e.fois > 1 ? ` (x${e.fois})` : ''}`);
 
   // Les messages sont déjà dans la conversation, on ne les répète pas ici.
   const actions = memory.actions.filter((a) => a.name !== 'parler' && a.name !== 'murmurer');
