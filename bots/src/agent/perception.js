@@ -112,14 +112,18 @@ function observe(bot, mcData, memory) {
   if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
   if (memory.envie) lines.push(`Ce que tu as envie de faire dans cette partie : ${memory.envie}`);
   if (memory.mission) lines.push(`Ta mission : ${memory.mission}`);
-  // Une demande d'un joueur passe avant la mission : il continuait à chercher des diamants quand on lui disait "on remonte".
-  const demandeRecente = memory.demandes.some((d) => Date.now() - d.t < 2 * 60000);
-  if (memory.etape && !demandeRecente) lines.push(`Prochaine étape pour avancer (calculée pour toi) : ${memory.etape}`);
+  // Toujours affichée : c'est le bot qui choisit entre son étape et une demande (selon son caractère).
+  if (memory.etape) lines.push(`Prochaine étape pour avancer (calculée pour toi) : ${memory.etape}`);
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {
-    lines.push('', "Ce qu'on t'a demandé récemment (fais-le, ou dis simplement que tu ne peux pas) :");
+    lines.push('', "Ce qu'on t'a demandé récemment (à toi de voir selon ton caractère et ce que tu fais : maintenant, plus tard ou non) :");
     for (const d of demandes) lines.push(`- [${agoText(d.t)}] <${d.from}> ${d.text}`);
+  }
+  const promesses = (memory.promesses || []).filter((p) => Date.now() - p.t < 20 * 60000);
+  if (promesses.length > 0) {
+    lines.push('', "Tes promesses (quand ton truc est fini, tiens-les ou demande s'il a toujours besoin) :");
+    for (const p of promesses) lines.push(`- [${agoText(p.t)}] ${p.text}`);
   }
   if (memory.notes.length > 0) {
     lines.push('', 'Ton carnet (ce que tu as noté pour t\'en souvenir) :');

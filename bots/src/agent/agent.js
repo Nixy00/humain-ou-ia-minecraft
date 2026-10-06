@@ -13,20 +13,25 @@ const { startReflexes } = require('./reflexes');
 const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
 const { callTool } = require('../llm/structured');
 
+const HUMEURS = ['motivé', 'normal', 'normal', 'un peu fatigué', 'de bonne humeur'];
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 
 class Agent {
-  constructor({ username, persona, style, envie, objectifs }, { cfg, gateway, logger }) {
+  constructor({ username, persona, style, envie, objectifs, caractere }, { cfg, gateway, logger }) {
     this.username = username;
     this.persona = persona;
     this.objectifs = objectifs || [];
+    this.caractere = caractere || { serviable: 0.5, flemme: 0.5 };
+    // Humeur tirée au hasard pour la partie : le même bot n'est pas toujours aussi motivé.
+    this.humeur = HUMEURS[Math.floor(Math.random() * HUMEURS.length)];
     this.style = { ...STYLE_DEFAUT, ...style };
     this.actionEnCours = null;
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null, envie: envie || '', mission: cfg.agent ? cfg.agent.mission : '' };
+    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], promesses: [], objectif: null, envie: envie || '', mission: cfg.agent ? cfg.agent.mission : '' };
     this.seq = 0;
     this.busy = false;
     this.pendingReason = null;
@@ -228,7 +233,7 @@ class Agent {
         gateway: this.gateway,
         logger: this.logger,
         messages: [
-          { role: 'system', content: systemPrompt(this.username, this.persona) },
+          { role: 'system', content: systemPrompt(this.username, this.persona, this.caractere, this.humeur) },
           { role: 'user', content: turnPrompt(observation, reason) },
         ],
         tools: TOOLS,
@@ -242,7 +247,13 @@ class Agent {
         this.logger.write('decisions', { agent: this.username, decision_id: decisionId, reason, ok: false, llm_ms: llmMs });
         return;
       }
-      const { objectif, note, ...args } = choice.args;
+      const { objectif, note, promesse, ...args } = choice.args;
+      // Promesse ("jfinis ma cabane et jtaide") : il la voit pendant 20 min pour y revenir plus tard.
+      if (promesse) {
+        this.memory.promesses.push({ text: promesse, t: Date.now() });
+        if (this.memory.promesses.length > 3) this.memory.promesses.shift();
+        this.logger.write('notes', { agent: this.username, decision_id: decisionId, promesse });
+      }
       if (objectif) this.memory.objectif = objectif;
       // Carnet de notes : l'IA garde ce qu'elle veut retenir (10 dernières notes),
       // et tout est enregistré dans notes.jsonl pour l'analyse.
@@ -371,7 +382,7 @@ class Agent {
       gateway: this.gateway,
       logger: this.logger,
       messages: [
-        { role: 'system', content: systemPrompt(this.username, this.persona) },
+        { role: 'system', content: systemPrompt(this.username, this.persona, this.caractere, this.humeur) },
         { role: 'user', content: votePrompt(observation, players, trigger) },
       ],
       tools: [tool],

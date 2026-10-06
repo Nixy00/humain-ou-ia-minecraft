@@ -443,15 +443,20 @@ test('fabriquer plusieurs objets : une fabrication a la fois (bug d inventaire s
   assert.deepStrictEqual(appels, [1, 1, 1, 1]);
 });
 
-test('demandes : un nouveau message du meme joueur remplace l ancien, et passe avant la mission', () => {
+test('demandes : le bot voit la demande ET son etape, ses promesses, et choisit selon son caractere', () => {
   const { observe } = require('../src/agent/perception');
   const { Vec3 } = require('vec3');
   const memory = { events: [], chat: [], actions: [], notes: [], demandes: [{ from: 'SAHYGO', text: 'on remonte', t: Date.now() }], objectif: null, etape: 'collecter diamond_ore (5)' };
   const bot = { username: 'Joueur4', entity: { position: new Vec3(0, -50, 0) }, players: {}, entities: {}, health: 20, food: 20,
     inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
   const texte = observe(bot, { blocksArray: [] }, memory);
-  assert.ok(!texte.includes('Prochaine étape'));
+  assert.ok(texte.includes('Prochaine étape'));
+  assert.ok(texte.includes('on remonte'));
   assert.ok(texte.includes('sous terre'));
+  memory.promesses = [{ text: 'aider SAHYGO a couper du bois', t: Date.now() }];
+  assert.ok(observe(bot, { blocksArray: [] }, memory).includes('aider SAHYGO a couper du bois'));
+  const { systemPrompt } = require('../src/agent/prompt');
+  assert.ok(systemPrompt('Joueur5', '', { serviable: 0.3, flemme: 0.2 }, 'motivé').includes('serviable 3/10, flemme 2/10'));
 });
 
 test('aller vers un joueur trop loin : conseil de demander ses coordonnees', async () => {

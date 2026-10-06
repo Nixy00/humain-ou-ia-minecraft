@@ -21,7 +21,11 @@
       },
       "white_bed",
       "chest"
-    ]
+    ],
+    "caractere": {
+      "serviable": 0.8,
+      "flemme": 0.4
+    }
   },
   {
     "username": "Joueur5",
@@ -46,7 +50,11 @@
       "iron_boots",
       "shield",
       "diamond_sword"
-    ]
+    ],
+    "caractere": {
+      "serviable": 0.3,
+      "flemme": 0.2
+    }
   },
   {
     "username": "Joueur6",
@@ -71,6 +79,10 @@
         "objet": "cobblestone",
         "nombre": 64
       }
-    ]
+    ],
+    "caractere": {
+      "serviable": 0.5,
+      "flemme": 0.5
+    }
   }
 ]

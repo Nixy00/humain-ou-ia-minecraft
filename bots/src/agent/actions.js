@@ -15,6 +15,7 @@ const { frapper, delaiEntreCoups } = require('./humanizer');
 // répétées dans les 23 outils, elles faisaient 40 % de la taille de chaque requête.
 const OBJECTIF = { type: 'string', maxLength: 120 };
 const NOTE = { type: 'string', maxLength: 120 };
+const PROMESSE = { type: 'string', maxLength: 120 };
 const JOUEUR = { type: 'string', maxLength: 32 };
 const ID_MC = { type: 'string', maxLength: 64 };
 const COORD = { type: 'integer' };
@@ -23,7 +24,7 @@ function tool(name, description, properties, required = []) {
   return {
     name,
     description,
-    parameters: { type: 'object', properties: { ...properties, objectif: OBJECTIF, note: NOTE }, required },
+    parameters: { type: 'object', properties: { ...properties, objectif: OBJECTIF, note: NOTE, promesse: PROMESSE }, required },
   };
 }
 
