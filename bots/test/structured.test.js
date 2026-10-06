@@ -626,3 +626,27 @@ test('bouche : accepter arrete l action en cours et relance les mains ; ne_rien_
   assert.strictEqual(a.bot.interrompre, false);
   assert.strictEqual(relances.length, 1);
 });
+
+test('reflexion : resume, avis, intention et defi adopte devient l etape suivante', async () => {
+  const { Agent } = require('../src/agent/agent');
+  const { Vec3 } = require('vec3');
+  const mc = await import('../src/mindcraft/mcdata.mjs');
+  mc.init('1.20.4');
+  const reflexion = { resume: 'jai fait ma pioche en fer, SAHYGO lance un defi', avis: [{ joueur: 'SAHYGO', avis: 'marrant mais insistant' }],
+    intention: 'faire le bloc de diams pour gagner', nouvel_objectif: 'diamond_block', nombre: 1 };
+  const gateway = { cfg: { model: 'test', toolChoice: 'auto' }, mode: 'tools',
+    chat: async () => ({ message: { role: 'assistant', tool_calls: [{ function: { name: 'reflexion', arguments: JSON.stringify(reflexion) } }] }, finishReason: 'tool_calls' }) };
+  const a = new Agent(require('../agents.json')[1], { cfg: { agent: { humanize: false, mission: '' }, llm: { maxFormatRetries: 0 } }, gateway, logger: { write() {}, gameId: 't' } });
+  a.mcData = {};
+  a.recettes = mc.getItemCraftingRecipes;
+  const inv = [{ name: 'iron_pickaxe', count: 1 }];
+  a.bot = { username: 'Joueur5', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => inv }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: require('minecraft-data')('1.20.4') };
+  await a.reflechir();
+  assert.strictEqual(a.memory.avis.SAHYGO, 'marrant mais insistant');
+  assert.strictEqual(a.memory.reflexion.intention, 'faire le bloc de diams pour gagner');
+  assert.match(a.etapeDuMoment(a.bot), /^collecter diamond_ore \(9\)/);
+  inv.push({ name: 'diamond_block', count: 1 });
+  a.etapeDuMoment(a.bot);
+  assert.strictEqual(a.memory.objectifPerso, null); // objectif atteint : on revient au profil
+});

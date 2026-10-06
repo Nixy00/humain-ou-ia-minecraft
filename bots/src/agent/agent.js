@@ -6,8 +6,8 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 const minecraftData = require('minecraft-data');
 
 const { observe } = require('./perception');
-const { execute, checkArgs, outilsUtiles, OUTILS_BOUCHE } = require('./actions');
-const { systemPrompt, turnPrompt, bouchePrompt, votePrompt } = require('./prompt');
+const { execute, checkArgs, outilsUtiles, OUTILS_BOUCHE, OUTIL_REFLEXION } = require('./actions');
+const { systemPrompt, turnPrompt, bouchePrompt, reflexionPrompt, votePrompt } = require('./prompt');
 const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, delaiAvantAction, uniform } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
 const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
@@ -33,7 +33,7 @@ class Agent {
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], promesses: [], envie: envie || '', mission: cfg.agent ? cfg.agent.mission : '' };
+    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], promesses: [], historique: [], avis: {}, reflexion: null, objectifPerso: null, envie: envie || '', mission: cfg.agent ? cfg.agent.mission : '' };
     this.seq = 0;
     this.busy = false;
     this.pendingReason = null;
@@ -86,6 +86,10 @@ class Agent {
       this.reflexTimer = startReflexes(bot, this.style, () => this.actionEnCours, (type, detail) => this.onEvent({ type: 'reflexe', text: `${type} : ${detail}` }, null));
       // État du bot toutes les 10 s (etat.jsonl) : pour suivre la partie en direct et pouvoir la rejouer.
       this.etatTimer = setInterval(() => this.noterEtat(), 10000);
+      // La réflexion toutes les 3 minutes (seulement quand il joue vraiment).
+      this.reflexionTimer = setInterval(() => {
+        if (this.cfg.agent.sansHumain || this.humainConnecte()) this.reflechir();
+      }, 180000);
       this.schedule('tu viens de te connecter', uniform(3000, 8000));
     });
 
@@ -354,6 +358,49 @@ class Agent {
     }
   }
 
+  // LA RÉFLEXION : toutes les 3 minutes il fait le point (résumé, avis sur les joueurs, intention, objectif).
+  // Sans ça, il ne se souvenait que de ses 5 dernières actions et oubliait un défi 2 minutes après.
+  async reflechir() {
+    if (this.reflechit || this.stopping || !this.mcData || !this.bot?.entity) return;
+    this.reflechit = true;
+    const bot = this.bot;
+    const decisionId = `${this.username}-reflexion-${++this.seq}`;
+    const t0 = Date.now();
+    try {
+      const historique = this.memory.historique
+        .map((a) => `- ${a.name} ${JSON.stringify(a.args)} -> ${a.ok ? 'réussi' : 'raté'} : ${a.result}`).join('\n');
+      const choice = await callTool({
+        gateway: this.gateway,
+        logger: this.logger,
+        messages: [
+          { role: 'system', content: systemPrompt(this.username, this.persona, this.caractere, this.humeur) },
+          { role: 'user', content: reflexionPrompt(observe(bot, this.mcData, this.memory), historique) },
+        ],
+        tools: [OUTIL_REFLEXION],
+        meta: { agent: this.username, decisionId, kind: 'reflexion' },
+        extraCheck: (name, args) => (args.nouvel_objectif && !bot.registry.itemsByName[args.nouvel_objectif]
+          ? [`nouvel_objectif "${args.nouvel_objectif}" n'est pas un identifiant Minecraft`] : []),
+        maxFormatRetries: this.cfg.llm.maxFormatRetries,
+      });
+      if (!choice) return;
+      const r = choice.args;
+      this.memory.reflexion = { resume: r.resume, intention: r.intention, t: Date.now() };
+      for (const { joueur, avis } of r.avis || []) {
+        if (joueur && avis && joueur !== this.username) this.memory.avis[joueur] = avis;
+      }
+      if (r.nouvel_objectif) this.memory.objectifPerso = { objet: r.nouvel_objectif, nombre: r.nombre || 1 };
+      this.logger.write('decisions', {
+        agent: this.username, decision_id: decisionId, kind: 'reflexion', ok: true, tool: 'reflexion', args: r,
+        llm_call_ids: choice.callIds, llm_ms: Date.now() - t0,
+      });
+      this.log(`réflexion : ${r.intention}${r.nouvel_objectif ? ` (nouvel objectif : ${r.nouvel_objectif})` : ''}`);
+    } catch (err) {
+      this.logger.write('errors', { agent: this.username, decision_id: decisionId, message: 'réflexion', detail: err.stack });
+    } finally {
+      this.reflechit = false;
+    }
+  }
+
   // LES MAINS : choisissent l'action de jeu suivante (le chat, c'est la bouche).
   async decide(reason) {
     if (this.busy || this.stopping || !this.bot?.entity) return;
@@ -410,6 +457,8 @@ class Agent {
       enchainer = `ton action ${choice.name} vient de finir (${res.ok ? 'réussie' : 'ratée'})`;
       this.memory.actions.push({ name: choice.name, args, ok: res.ok, result: res.result, t: Date.now() });
       if (this.memory.actions.length > 5) this.memory.actions.shift();
+      this.memory.historique.push({ name: choice.name, args, ok: res.ok, result: String(res.result).slice(0, 100), t: Date.now() });
+      if (this.memory.historique.length > 30) this.memory.historique.shift();
       this.log(`${choice.name} ${JSON.stringify(args)} -> ${res.result}${pensee ? ` [pense : ${pensee}]` : ''}`);
       // De temps en temps, il dit un mot sur ce qu'il fait (un joueur bavard parle plus souvent).
       if (this.cfg.agent.humanize && Math.random() < this.style.bavard * 0.1 && Object.keys(bot.players).length > 1) {
@@ -431,6 +480,14 @@ class Agent {
     const mission = objetDeMission(this.memory.mission, this.mcData);
     // Mission finie : on le lui dit (sinon il refabriquait un deuxième casque avec ses diamants).
     if (mission) return prochaineEtape(mission, inv, this.recettes) || `aucune, mission accomplie (tu as ${mission}) : ne le refabrique pas, fais ce que tu veux`;
+    // Objectif que le bot s'est fixé à sa réflexion (un défi accepté par exemple) : il passe avant son profil.
+    if (this.memory.objectifPerso) {
+      const o = this.memory.objectifPerso;
+      const etape = prochaineEtape(o.objet, inv, this.recettes, o.nombre);
+      if (etape) return etape;
+      this.logger.write('events', { agent: this.username, type: 'objectif_atteint', text: `${o.nombre} ${o.objet}` });
+      this.memory.objectifPerso = null;
+    }
     const but = objectifDuMoment(this.objectifs.filter((o) => !(o === 'cabane' && bot.cabaneFinie)), inv);
     if (!but) return null;
     if (but.objet === 'cabane') {
@@ -561,6 +618,7 @@ class Agent {
     clearInterval(this.tickTimer);
     clearInterval(this.reflexTimer);
     clearInterval(this.etatTimer);
+    clearInterval(this.reflexionTimer);
     clearTimeout(this.decideTimer);
     this.raisonPrevue = null;
     this.mcData = null;

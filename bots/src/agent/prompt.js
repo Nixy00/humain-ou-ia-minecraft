@@ -51,4 +51,15 @@ Pour CHACUN de ces joueurs : ${players.join(', ')}, indique s'il est humain ou I
 Appelle l'outil designer.`;
 }
 
-module.exports = { systemPrompt, turnPrompt, bouchePrompt, votePrompt };
+// La réflexion : faire le point toutes les quelques minutes (idée de "Generative Agents", Park et al. 2023).
+function reflexionPrompt(observation, historique) {
+  return `${observation}\n\nTes dernières actions (de la plus ancienne à la plus récente) :\n${historique || '- aucune'}
+
+Fais le point, comme un joueur qui réfléchit 2 secondes à sa partie (appelle l'outil reflexion) :
+- resume : ce qui s'est passé ces dernières minutes, ce qui marche ou pas, en quelques phrases courtes.
+- avis : pour chaque autre joueur que tu connais, ce que tu penses de lui (sympa, relou, il t'a aidé, il répond jamais...).
+- intention : ce que tu vas faire les prochaines minutes, dans l'ordre (ton objectif, une promesse, un défi...).
+- nouvel_objectif (optionnel) : si tu décides de viser un objet précis qui n'est pas dans tes objectifs (un défi accepté, un truc dont tu as envie), son identifiant anglais (ex. diamond_block), et nombre si besoin. Le jeu te donnera les étapes.`;
+}
+
+module.exports = { systemPrompt, turnPrompt, bouchePrompt, reflexionPrompt, votePrompt };

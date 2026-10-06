@@ -135,6 +135,14 @@ function observe(bot, mcData, memory) {
     lines.push(`Tu peux fabriquer maintenant : ${f.length ? f.join(', ') : "rien d'utile"}.`);
   }
   if (memory.envie) lines.push(`Ce que tu as envie de faire dans cette partie : ${memory.envie}`);
+  // Ce qu'il a décidé à sa dernière réflexion (agent.js, reflechir).
+  if (memory.reflexion) {
+    lines.push(`Ta dernière réflexion (${agoText(memory.reflexion.t)}) : ${memory.reflexion.resume}`);
+    lines.push(`Ton intention : ${memory.reflexion.intention}`);
+  }
+  const avis = Object.entries(memory.avis || {});
+  if (avis.length > 0) lines.push(`Ce que tu penses des autres : ${avis.map(([j, a]) => `${j} = ${a}`).join(' ; ')}`);
+  if (memory.objectifPerso) lines.push(`Objectif que tu t'es fixé : ${memory.objectifPerso.nombre} ${memory.objectifPerso.objet}`);
   if (memory.mission) lines.push(`Ta mission : ${memory.mission}`);
   // Toujours affichée : c'est le bot qui choisit entre son étape et une demande (selon son caractère).
   if (memory.etape) lines.push(`Prochaine étape pour avancer (calculée pour toi) : ${memory.etape}`);

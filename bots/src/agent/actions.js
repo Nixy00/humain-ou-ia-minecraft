@@ -446,4 +446,22 @@ const OUTILS_BOUCHE = [
     { quoi: { type: 'string', minLength: 1, maxLength: 120 }, message: { type: 'string', maxLength: 200 } }, ['quoi']),
 ];
 
-module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles, OUTILS_BOUCHE };
+// Outil de la réflexion (agent.js, reflechir) : toutes les quelques minutes, il fait le point.
+const TEXTE = (n) => ({ type: 'string', maxLength: n });
+const OUTIL_REFLEXION = {
+  name: 'reflexion',
+  description: 'Faire le point sur la partie.',
+  parameters: {
+    type: 'object',
+    properties: {
+      resume: TEXTE(400),
+      avis: { type: 'array', items: { type: 'object', properties: { joueur: TEXTE(32), avis: TEXTE(120) } } },
+      intention: TEXTE(200),
+      nouvel_objectif: TEXTE(64),
+      nombre: { type: 'integer', minimum: 1, maximum: 64 },
+    },
+    required: ['resume', 'intention'],
+  },
+};
+
+module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles, OUTILS_BOUCHE, OUTIL_REFLEXION };
