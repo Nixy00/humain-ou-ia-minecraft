@@ -89,6 +89,10 @@ function checkArgs(bot, name, args) {
   // bot.chat exécute tout texte commençant par "/" comme une commande serveur (ex. /designer) :
   // le modèle, ou un joueur qui le manipule par le chat, pourrait voter ou agir hors des outils.
   if (typeof args.message === 'string' && args.message.trimStart().startsWith('/')) errors.push('un message ne peut pas commencer par "/"');
+  // Affamé sans nourriture, le builder a choisi "manger" 23 fois de suite : on refuse et il choisit autre chose.
+  if (name === 'manger' && bot.inventory && !bot.inventory.items().some((i) => bot.registry.foodsByName[i.name])) {
+    errors.push("tu n'as rien à manger : chasse un animal (chasser) ou explore pour en trouver");
+  }
   // Seul sur le serveur, il n'a personne à qui parler (il écrivait "t es ou" dans le vide).
   if (name === 'parler' && bot.players && Object.keys(bot.players).length <= 1) {
     errors.push("personne d'autre n'est connecté, inutile de parler : fais autre chose");

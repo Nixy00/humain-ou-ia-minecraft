@@ -502,3 +502,11 @@ test('builder : il va chercher des planches avant de construire', async () => {
   assert.match(a.etapeDuMoment(bot({ ...outils, cobblestone: 40 })), /^collecter oak_log/);
   assert.strictEqual(a.etapeDuMoment(bot({ ...outils, cobblestone: 46, oak_planks: 30 })), 'construire (ta cabane)');
 });
+
+test('manger sans nourriture : refuse avant d agir, conseil de chasser', () => {
+  const { checkArgs } = require('../src/agent/actions');
+  const bot = { registry: require('minecraft-data')('1.20.4'), inventory: { items: () => [{ name: 'spruce_log', count: 96 }] }, players: {}, username: 'Joueur6' };
+  assert.match(checkArgs(bot, 'manger', {}).join(' '), /chasse/);
+  bot.inventory.items = () => [{ name: 'beef', count: 1 }];
+  assert.deepStrictEqual(checkArgs(bot, 'manger', {}), []);
+});
