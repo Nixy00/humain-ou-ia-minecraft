@@ -65,6 +65,8 @@ class Agent {
       moves.canDig = false; // on ne casse pas de blocs pour se déplacer (constructions des autres)
       bot.pathfinder.setMovements(moves);
       bot.pathfinder.thinkTimeout = 10000; // 5 s par défaut : trop court pour les blocs dans les grottes ("Took to long to decide path")
+      // Sans limite, la recherche de chemin vers un diamant au fond d'une grotte a rempli 2 Go de mémoire et fait planter le bot.
+      bot.pathfinder.searchRadius = 96;
       this.log('connecté');
       this.logger.write('events', { agent: this.username, type: 'connexion' });
       this.tickTimer = setInterval(() => {
@@ -217,7 +219,8 @@ class Agent {
     let enchainer = null;
     try {
       const but = this.recettes && objetDeMission(this.memory.mission, this.mcData);
-      this.memory.etape = but ? prochaineEtape(but, bot.inventory.items(), this.recettes) : null;
+      // Mission finie : on le lui dit (sinon il refabriquait un deuxième casque avec ses diamants).
+      this.memory.etape = but ? (prochaineEtape(but, bot.inventory.items(), this.recettes) || `aucune, mission accomplie (tu as ${but}) : ne le refabrique pas, fais ce que tu veux`) : null;
       const observation = observe(this.bot, this.mcData, this.memory);
       const choice = await callTool({
         gateway: this.gateway,
