@@ -559,3 +559,14 @@ test('outils proposes : pas de manger sans nourriture, pas de chat seul, pas de 
   bot.inventory.items = () => [{ name: 'beef', count: 1 }];
   assert.ok(outilsUtiles(bot).some((t) => t.name === 'manger'));
 });
+
+test('meme action ratee 2 fois : la 3e est refusee ; message a tout le monde = pour moi', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur5', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  const echec = { name: 'cuire', args: { objet: 'raw_iron', quantite: 1 }, ok: false, result: 'You have no fuel to smelt raw_iron' };
+  a.memory.actions.push(echec, { ...echec, args: { ...echec.args, pensee: 'il me faut du fer' } });
+  assert.match(a.verifierEchecs('cuire', { objet: 'raw_iron', quantite: 1, pensee: 'encore' })[0], /2 fois/);
+  assert.deepStrictEqual(a.verifierEchecs('cuire', { objet: 'raw_iron', quantite: 2 }), []);
+  const { turnPrompt } = require('../src/agent/prompt');
+  assert.ok(!turnPrompt('obs', 'ton action collecter vient de finir (réussie)', true).includes("Personne ne t'a parlé"));
+});

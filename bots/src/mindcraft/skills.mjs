@@ -73,7 +73,14 @@ export async function craftRecipe(bot, itemName, num=1) {
                     return false;
                 }
                 await placeBlock(bot, 'crafting_table', pos.x, pos.y, pos.z);
+                // Modif SAE : on laisse au serveur le temps de confirmer la pose, sinon la table n'est pas
+                // encore vue et on fabriquait sans table ("Recipe requires craftingTable").
+                await new Promise((r) => setTimeout(r, 300));
                 craftingTable = world.getNearestBlock(bot, 'crafting_table', craftingTableRange);
+                if (!craftingTable) {
+                    log(bot, `Failed to place the crafting table, try again.`);
+                    return false;
+                }
                 if (craftingTable) {
                     recipes = bot.recipesFor(mc.getItemId(itemName), null, 1, craftingTable);
                     placedTable = true;

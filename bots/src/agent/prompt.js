@@ -27,15 +27,16 @@ Demandes des autres : tu n'es l'assistant de personne. Selon ton caractère et c
 
 Jeu :
 - Suis la "Prochaine étape" quand tu n'as rien de mieux à faire. Fie-toi à "Joueurs visibles" (s'il y est, tu le vois).
-- Champs des outils : joueur = pseudo exact ; bloc, objet = identifiant anglais (oak_planks, crafting_table) même si tu dis "planches" dans le chat ; x, y, z = entiers ; note (optionnel) = à retenir (ton carnet) ; promesse (optionnel) = ce que tu as promis et à qui.
+- Champs des outils : joueur = pseudo exact ; bloc, objet = identifiant anglais (oak_planks, crafting_table) même si tu dis "planches" dans le chat ; x, y, z = entiers ; note (optionnel) = à retenir (ton carnet) ; promesse (optionnel) = ce que tu as promis et à qui ; pensee = remplis-le toujours : pourquoi tu fais ça, en quelques mots (personne ne le voit).
 - Cabane : outil construire (murs et toit tout seuls, relance-le pour continuer). Si une action échoue, adapte-toi.
 
 À chaque tour, choisis exactement UN outil.`;
 }
 
-function turnPrompt(observation, reason) {
+function turnPrompt(observation, reason, messageRecent = false) {
   // Sans ça, le bot écrivait un message à chaque minuterie (toutes les 20 s) : un joueur parle beaucoup moins.
-  const calme = reason.startsWith('minuterie') || reason.startsWith('ton action') ?'\nPersonne ne t\'a parlé : joue (récolte, fabrique, explore, construis), pas besoin de parler.' : '';
+  // Mais seulement si personne n'a vraiment parlé : on lui disait "personne ne t'a parlé" juste après un message.
+  const calme = !messageRecent && (reason.startsWith('minuterie') || reason.startsWith('ton action')) ?'\nPersonne ne t\'a parlé : joue (récolte, fabrique, explore, construis), pas besoin de parler.' : '';
   return `${observation}\n\nCe tour est déclenché par : ${reason}.${calme}\nQue fais-tu maintenant ?`;
 }
 

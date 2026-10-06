@@ -93,7 +93,10 @@ class Agent {
       // Un joueur ne réagit pas à tout : toujours si on lui parle (ou s'ils ne sont que deux sur le serveur),
       // sinon selon son caractère (style.bavard).
       const seulsTousLesDeux = Object.keys(bot.players).length <= 2;
-      const pourMoi = seulsTousLesDeux || text.toLowerCase().includes(this.username.toLowerCase());
+      // Un message à tout le monde ("vous", "qq1", "allo y'a quelqu'un") le concerne aussi :
+      // pendant un test, "bande de fou allez me chercher..." et "vous pouvez parler ???" n'ont eu aucune réponse.
+      const pourTous = /(vous|tout le monde|qq1|quelqu'un|quelquun|personne|les gars)/i.test(text);
+      const pourMoi = seulsTousLesDeux || pourTous || text.toLowerCase().includes(this.username.toLowerCase());
       const reagir = pourMoi || !this.cfg.agent.humanize || Math.random() < this.style.bavard;
       // Quelqu'un lui parle : comme un joueur, il s'arrête dans ce qu'il fait pour répondre.
       if (pourMoi && this.actionEnCours) {
@@ -249,11 +252,11 @@ class Agent {
         logger: this.logger,
         messages: [
           { role: 'system', content: systemPrompt(this.username, this.persona, this.caractere, this.humeur) },
-          { role: 'user', content: turnPrompt(observation, reason) },
+          { role: 'user', content: turnPrompt(observation, reason, this.memory.chat.some((m) => m.from !== this.username && Date.now() - m.t < 60000)) },
         ],
         tools: outilsUtiles(bot),
         meta: { agent: this.username, decisionId, kind: 'decision' },
-        extraCheck: (name, args) => [...checkArgs(this.bot, name, args), ...this.verifierRepetition(name, args)],
+        extraCheck: (name, args) => [...checkArgs(this.bot, name, args), ...this.verifierRepetition(name, args), ...this.verifierEchecs(name, args)],
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
       });
       const llmMs = Date.now() - t0;
@@ -262,7 +265,8 @@ class Agent {
         this.logger.write('decisions', { agent: this.username, decision_id: decisionId, reason, ok: false, llm_ms: llmMs });
         return;
       }
-      const { note, promesse, ...args } = choice.args;
+      // pensee : pourquoi il fait ça, en quelques mots. Jamais montrée en jeu, seulement dans les journaux (analyse).
+      const { note, promesse, pensee, ...args } = choice.args;
       // Promesse ("jfinis ma cabane et jtaide") : il la voit pendant 20 min pour y revenir plus tard.
       if (promesse) {
         this.memory.promesses.push({ text: promesse, t: Date.now() });
@@ -278,7 +282,7 @@ class Agent {
       }
       this.logger.write('decisions', {
         agent: this.username, decision_id: decisionId, reason, ok: true,
-        tool: choice.name, args, llm_call_ids: choice.callIds, llm_ms: llmMs,
+        tool: choice.name, args, pensee: pensee ?? null, llm_call_ids: choice.callIds, llm_ms: llmMs,
       });
 
       let delay = 0;
@@ -323,7 +327,7 @@ class Agent {
       enchainer = `ton action ${choice.name} vient de finir (${res.ok ? 'réussie' : 'ratée'})`;
       this.memory.actions.push({ name: choice.name, args, ok: res.ok, result: res.result, t: Date.now() });
       if (this.memory.actions.length > 5) this.memory.actions.shift();
-      this.log(`${choice.name} ${JSON.stringify(args)} -> ${res.result}`);
+      this.log(`${choice.name} ${JSON.stringify(args)} -> ${res.result}${pensee ? ` [pense : ${pensee}]` : ''}`);
     } catch (err) {
       this.logger.write('errors', { agent: this.username, decision_id: decisionId, message: 'décision', detail: err.stack });
     } finally {
@@ -349,6 +353,15 @@ class Agent {
       return (planches > 0 && prochaineEtape('oak_planks', inv, this.recettes, planches)) || 'construire (ta cabane)';
     }
     return prochaineEtape(but.objet, inv, this.recettes, but.nombre);
+  }
+
+  // La même action avec les mêmes arguments a raté 2 fois de suite : on refuse la 3e
+  // (il a tenté de cuire sans combustible 5 fois de suite).
+  verifierEchecs(name, args) {
+    const cle = (n, a) => n + JSON.stringify(Object.fromEntries(Object.entries(a).filter(([k]) => !['note', 'promesse', 'pensee'].includes(k))));
+    const deux = this.memory.actions.slice(-2);
+    const rate = deux.length === 2 && deux.every((a) => !a.ok && cle(a.name, a.args) === cle(name, args));
+    return rate ? [`${name} a raté 2 fois de suite (${deux[1].result.slice(0, 80)}) : fais autre chose`] : [];
   }
 
   // Après une décision : une demande d'un joueur en attente passe d'abord.
