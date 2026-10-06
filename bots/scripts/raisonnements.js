@@ -18,7 +18,14 @@ const lire = (nom) => {
 const lignes = [];
 for (const d of lire('decisions.jsonl')) {
   if (!d.ok || (seulement && d.agent !== seulement)) continue;
-  lignes.push([d.ts, `${d.agent} | ${d.reason} -> ${d.tool} ${JSON.stringify(d.args)}${d.pensee ? `\n           pense : ${d.pensee}` : ''}`]);
+  if (d.kind === 'reflexion') {
+    const r = d.args;
+    const avis = (r.avis || []).map((x) => `\n           avis sur ${x.joueur} : ${x.avis}`).join('');
+    lignes.push([d.ts, `${d.agent} | RÉFLEXION : ${r.resume}\n           intention : ${r.intention}${r.nouvel_objectif ? ` (objectif : ${r.nouvel_objectif})` : ''}${avis}`]);
+    continue;
+  }
+  const qui = d.kind === 'bouche' ? 'BOUCHE' : 'mains';
+  lignes.push([d.ts, `${d.agent} (${qui}) | ${d.reason} -> ${d.tool} ${JSON.stringify(d.args)}${d.pensee ? `\n           pense : ${d.pensee}` : ''}`]);
 }
 // Les messages des joueurs, pour comprendre à quoi le bot réagit (une seule fois chacun).
 const vus = new Set();
