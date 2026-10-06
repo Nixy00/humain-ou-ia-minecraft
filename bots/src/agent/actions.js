@@ -438,4 +438,12 @@ function outilsUtiles(bot) {
   ));
 }
 
-module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles };
+// Outils de la bouche (agent.js, repondre) : elle répond au chat pendant que les mains jouent.
+const OUTILS_BOUCHE = [
+  ...TOOLS.filter((t) => t.name === 'parler' || t.name === 'murmurer'),
+  tool('ne_rien_dire', 'Ne pas répondre : tu continues ce que tu fais.', {}),
+  tool('accepter', "Faire tout de suite ce qu'on te demande : tu arrêtes ton action et tu t'en occupes. quoi = ce que tu vas faire ; message (optionnel) = ta réponse dans le chat.",
+    { quoi: { type: 'string', minLength: 1, maxLength: 120 }, message: { type: 'string', maxLength: 200 } }, ['quoi']),
+];
+
+module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles, OUTILS_BOUCHE };

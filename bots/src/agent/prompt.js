@@ -23,7 +23,7 @@ Chat (tu écris comme un vrai joueur) :
 - Ta position : décris l'endroit ("vers le spawn") ; si on te demande tes coordonnées, donne "x z" ("330 104").
 - Ne propose ou ne prétends jamais avoir un objet absent de ton inventaire.
 
-Demandes des autres : tu n'es l'assistant de personne. Selon ton caractère et ce que tu fais : aider tout de suite ("ok jarrive"), plus tard ("jfinis et jtaide", et mets-le dans le champ "promesse"), ou refuser ("flemme dsl", "jsuis occupé", ou tu ignores). Moins tu es serviable, plus tu refuses. Une promesse finie : tiens-la ou demande "tas tjr besoin ?".
+Demandes des autres : tu n'es l'assistant de personne. Selon ton caractère et ce que tu fais : aider tout de suite (outil accepter, "ok jarrive"), plus tard ("jfinis et jtaide", et mets-le dans le champ "promesse"), ou refuser ("flemme dsl", "jsuis occupé", ou tu ignores). Moins tu es serviable, plus tu refuses. Une promesse finie : tiens-la ou demande "tas tjr besoin ?".
 
 Jeu :
 - Suis la "Prochaine étape" quand tu n'as rien de mieux à faire. Fie-toi à "Joueurs visibles" (s'il y est, tu le vois).
@@ -33,11 +33,16 @@ Jeu :
 À chaque tour, choisis exactement UN outil.`;
 }
 
-function turnPrompt(observation, reason, messageRecent = false) {
-  // Sans ça, le bot écrivait un message à chaque minuterie (toutes les 20 s) : un joueur parle beaucoup moins.
-  // Mais seulement si personne n'a vraiment parlé : on lui disait "personne ne t'a parlé" juste après un message.
-  const calme = !messageRecent && (reason.startsWith('minuterie') || reason.startsWith('ton action')) ?'\nPersonne ne t\'a parlé : joue (récolte, fabrique, explore, construis), pas besoin de parler.' : '';
-  return `${observation}\n\nCe tour est déclenché par : ${reason}.${calme}\nQue fais-tu maintenant ?`;
+// Les mains : une action de jeu. Le chat est géré à part par la bouche (bouchePrompt).
+function turnPrompt(observation, reason) {
+  return `${observation}\n\nCe tour est déclenché par : ${reason}.\nChoisis ta prochaine action de jeu (tu ne parles pas ici, le chat est géré à part).`;
+}
+
+// La bouche : répondre au chat pendant que l'action en cours continue.
+function bouchePrompt(observation, raison, actionEnCours) {
+  return `${observation}\n\nDans le chat : ${raison}.
+Tu es en train de : ${actionEnCours || 'rien de spécial'}, et tu continues pendant que tu tapes (comme un vrai joueur).
+Choisis : parler ou murmurer pour répondre (tu peux refuser, ou promettre pour plus tard avec le champ promesse), accepter si tu lâches ce que tu fais pour t'en occuper tout de suite, ou ne_rien_dire.`;
 }
 
 function votePrompt(observation, players, trigger) {
@@ -46,4 +51,4 @@ Pour CHACUN de ces joueurs : ${players.join(', ')}, indique s'il est humain ou I
 Appelle l'outil designer.`;
 }
 
-module.exports = { systemPrompt, turnPrompt, votePrompt };
+module.exports = { systemPrompt, turnPrompt, bouchePrompt, votePrompt };

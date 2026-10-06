@@ -6,8 +6,8 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 const minecraftData = require('minecraft-data');
 
 const { observe } = require('./perception');
-const { execute, checkArgs, outilsUtiles } = require('./actions');
-const { systemPrompt, turnPrompt, votePrompt } = require('./prompt');
+const { execute, checkArgs, outilsUtiles, OUTILS_BOUCHE } = require('./actions');
+const { systemPrompt, turnPrompt, bouchePrompt, votePrompt } = require('./prompt');
 const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, delaiAvantAction, uniform } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
 const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
@@ -100,11 +100,6 @@ class Agent {
       const pourTous = !seulsTousLesDeux && !nomme && /(vous|tout le monde|qq1|qqun|quelqu'un|quelquun|personne|les gars)/i.test(text);
       const pourMoi = seulsTousLesDeux || nomme || pourTous;
       const reagir = pourMoi || !this.cfg.agent.humanize || Math.random() < this.style.bavard;
-      // Quelqu'un lui parle : comme un joueur, il s'arrête dans ce qu'il fait pour répondre.
-      if (pourMoi && !pourTous && this.actionEnCours) {
-        bot.interrompre = true;
-        bot.pathfinder.setGoal(null);
-      }
       // Ce qu'on lui demande reste affiché à part (le modèle n'utilisait jamais son carnet tout seul).
       if (pourMoi) {
         // On ne garde que le dernier message de chaque joueur : "envoie 2 diams" restait affiché 10 min
@@ -118,7 +113,9 @@ class Agent {
         this.reagirPlusTard(from, text);
         return;
       }
-      this.onEvent({ type: 'chat', from, text }, reagir ? `message de ${from}` : null);
+      // Il ne s'arrête plus de jouer pour répondre : c'est la bouche qui répond, les mains continuent.
+      this.onEvent({ type: 'chat', from, text }, null);
+      if (reagir) this.entendre(`message de ${from} : "${text}"`);
     });
     bot.on('whisper', (from, text) => {
       if (from === this.username) return;
@@ -244,6 +241,120 @@ class Agent {
     }, delayMs);
   }
 
+  // Champs communs à tous les outils, gardés en mémoire et journalisés (notes.jsonl).
+  retenirChamps(decisionId, note, promesse) {
+    // Promesse ("jfinis ma cabane et jtaide") : il la voit pendant 20 min pour y revenir plus tard.
+    if (promesse) {
+      this.memory.promesses.push({ text: promesse, t: Date.now() });
+      if (this.memory.promesses.length > 3) this.memory.promesses.shift();
+      this.logger.write('notes', { agent: this.username, decision_id: decisionId, promesse });
+    }
+    // Carnet de notes : ce que l'IA veut retenir (10 dernières notes).
+    if (note) {
+      this.memory.notes.push({ text: note, t: Date.now() });
+      if (this.memory.notes.length > 10) this.memory.notes.shift();
+      this.logger.write('notes', { agent: this.username, decision_id: decisionId, note });
+    }
+  }
+
+  // Envoie un message comme un joueur : faute de frappe possible, temps de lire et de taper, correction "*mot".
+  // On n'utilise pas execute() : ça remettrait à zéro l'interruption de l'action que les mains sont en train de faire.
+  async dire(nom, args, decisionId, llmMs) {
+    const bot = this.bot;
+    let delay = 0;
+    let correction = null;
+    if (this.cfg.agent.humanize) {
+      const f = fauteDeFrappe(enleverAccents(ecrireCommeJoueur(args.message), this.style.accents), this.style.fautes);
+      args.message = f.texte;
+      correction = f.correction;
+      const dernierMessage = [...this.memory.chat].reverse().find((m) => m.from !== this.username);
+      delay = messageDelayMs(args.message, dernierMessage ? dernierMessage.text : '', llmMs, this.style);
+      await sleep(delay);
+    }
+    if (this.bot !== bot || !bot.entity) return;
+    const type = nom === 'murmurer' ? 'whisper' : 'chat';
+    bot.chat(type === 'whisper' ? `/msg ${args.joueur} ${args.message}` : args.message);
+    this.retenirMessage({ type, from: this.username, to: args.joueur, text: args.message });
+    this.logger.write('actions', {
+      agent: this.username, decision_id: decisionId, tool: nom, args, ok: true, result: 'message envoyé', humanize_delay_ms: Math.round(delay), duration_ms: 0,
+    });
+    this.log(`${nom} ${JSON.stringify(args)}`);
+    if (correction) {
+      await sleep(uniform(1500, 3000));
+      bot.chat(type === 'whisper' ? `/msg ${args.joueur} ${correction}` : correction);
+      this.retenirMessage({ type, from: this.username, to: args.joueur, text: correction });
+      this.logger.write('actions', { agent: this.username, decision_id: decisionId, tool: 'correction', args: { message: correction }, ok: true });
+    }
+  }
+
+  // Plusieurs messages rapprochés : la bouche ne répond qu'une fois, après un petit temps de lecture.
+  entendre(raison) {
+    clearTimeout(this.boucheTimer);
+    this.boucheTimer = setTimeout(() => this.repondre(raison), this.cfg.agent.chatDebounceMs);
+  }
+
+  // LA BOUCHE : répond au chat pendant que les mains continuent l'action en cours (un humain tape en minant).
+  // Elle n'arrête l'action que si le bot accepte de faire tout de suite ce qu'on lui demande.
+  async repondre(raison) {
+    if (this.stopping || !this.mcData || !this.bot?.entity) return;
+    if (this.bavarde) { // une seule réponse à la fois : on garde la dernière raison pour après
+      this.raisonBouche = raison;
+      return;
+    }
+    this.bavarde = true;
+    const bot = this.bot;
+    const decisionId = `${this.username}-bouche-${++this.seq}`;
+    const t0 = Date.now();
+    try {
+      const observation = observe(bot, this.mcData, this.memory);
+      const choice = await callTool({
+        gateway: this.gateway,
+        logger: this.logger,
+        messages: [
+          { role: 'system', content: systemPrompt(this.username, this.persona, this.caractere, this.humeur) },
+          { role: 'user', content: bouchePrompt(observation, raison, this.actionEnCours) },
+        ],
+        tools: OUTILS_BOUCHE,
+        meta: { agent: this.username, decisionId, kind: 'bouche' },
+        extraCheck: (name, args) => [...checkArgs(bot, name, args), ...this.verifierRepetition(name, args)],
+        maxFormatRetries: this.cfg.llm.maxFormatRetries,
+      });
+      const llmMs = Date.now() - t0;
+      if (!choice) {
+        this.logger.write('decisions', { agent: this.username, decision_id: decisionId, kind: 'bouche', reason: raison, ok: false, llm_ms: llmMs });
+        return;
+      }
+      const { note, promesse, pensee, ...args } = choice.args;
+      this.retenirChamps(decisionId, note, promesse);
+      this.logger.write('decisions', {
+        agent: this.username, decision_id: decisionId, kind: 'bouche', reason: raison, ok: true,
+        tool: choice.name, args, pensee: pensee ?? null, llm_call_ids: choice.callIds, llm_ms: llmMs,
+      });
+      if (pensee) this.log(`bouche : ${choice.name} [pense : ${pensee}]`);
+      if (choice.name === 'parler' || choice.name === 'murmurer') await this.dire(choice.name, args, decisionId, llmMs);
+      if (choice.name === 'accepter') {
+        // Il laisse tomber ce qu'il faisait : les mains s'occupent de la demande juste après.
+        this.memory.accepte = { text: args.quoi, t: Date.now() };
+        if (this.actionEnCours) {
+          bot.interrompre = true;
+          bot.pathfinder.setGoal(null);
+        }
+        this.schedule(`tu as accepté : ${args.quoi}`, 300);
+        if (args.message) await this.dire('parler', { message: args.message }, decisionId, llmMs);
+      }
+    } catch (err) {
+      this.logger.write('errors', { agent: this.username, decision_id: decisionId, message: 'bouche', detail: err.stack });
+    } finally {
+      this.bavarde = false;
+      if (this.raisonBouche) {
+        const r = this.raisonBouche;
+        this.raisonBouche = null;
+        this.repondre(r);
+      }
+    }
+  }
+
+  // LES MAINS : choisissent l'action de jeu suivante (le chat, c'est la bouche).
   async decide(reason) {
     if (this.busy || this.stopping || !this.bot?.entity) return;
     this.busy = true;
@@ -253,17 +364,18 @@ class Agent {
     let enchainer = null;
     try {
       this.memory.etape = this.recettes ? this.etapeDuMoment(bot) : null;
-      const observation = observe(this.bot, this.mcData, this.memory);
+      // Les mains ne voient pas les demandes : c'est la bouche qui choisit (accepter, promettre ou refuser).
+      const observation = observe(this.bot, this.mcData, { ...this.memory, demandes: [] });
       const choice = await callTool({
         gateway: this.gateway,
         logger: this.logger,
         messages: [
           { role: 'system', content: systemPrompt(this.username, this.persona, this.caractere, this.humeur) },
-          { role: 'user', content: turnPrompt(observation, reason, this.memory.chat.some((m) => m.from !== this.username && Date.now() - m.t < 60000)) },
+          { role: 'user', content: turnPrompt(observation, reason) },
         ],
-        tools: outilsUtiles(bot),
+        tools: outilsUtiles(bot).filter((t) => t.name !== 'parler' && t.name !== 'murmurer'),
         meta: { agent: this.username, decisionId, kind: 'decision' },
-        extraCheck: (name, args) => [...checkArgs(this.bot, name, args), ...this.verifierRepetition(name, args), ...this.verifierEchecs(name, args)],
+        extraCheck: (name, args) => [...checkArgs(this.bot, name, args), ...this.verifierEchecs(name, args)],
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
       });
       const llmMs = Date.now() - t0;
@@ -274,39 +386,14 @@ class Agent {
       }
       // pensee : pourquoi il fait ça, en quelques mots. Jamais montrée en jeu, seulement dans les journaux (analyse).
       const { note, promesse, pensee, ...args } = choice.args;
-      // Promesse ("jfinis ma cabane et jtaide") : il la voit pendant 20 min pour y revenir plus tard.
-      if (promesse) {
-        this.memory.promesses.push({ text: promesse, t: Date.now() });
-        if (this.memory.promesses.length > 3) this.memory.promesses.shift();
-        this.logger.write('notes', { agent: this.username, decision_id: decisionId, promesse });
-      }
-      // Carnet de notes : l'IA garde ce qu'elle veut retenir (10 dernières notes),
-      // et tout est enregistré dans notes.jsonl pour l'analyse.
-      if (note) {
-        this.memory.notes.push({ text: note, t: Date.now() });
-        if (this.memory.notes.length > 10) this.memory.notes.shift();
-        this.logger.write('notes', { agent: this.username, decision_id: decisionId, note });
-      }
+      this.retenirChamps(decisionId, note, promesse);
       this.logger.write('decisions', {
         agent: this.username, decision_id: decisionId, reason, ok: true,
         tool: choice.name, args, pensee: pensee ?? null, llm_call_ids: choice.callIds, llm_ms: llmMs,
       });
 
-      let delay = 0;
-      let correction = null;
-      if (this.cfg.agent.humanize) {
-        if (choice.name === 'parler' || choice.name === 'murmurer') {
-          // Faute de frappe possible, puis le temps de lire, réfléchir et taper.
-          const f = fauteDeFrappe(enleverAccents(ecrireCommeJoueur(args.message), this.style.accents), this.style.fautes);
-          args.message = f.texte;
-          correction = f.correction;
-          const dernierMessage = [...this.memory.events].reverse().find((e) => e.type === 'chat' || e.type === 'whisper');
-          delay = messageDelayMs(args.message, dernierMessage ? dernierMessage.text : '', llmMs, this.style);
-        } else {
-          delay = delaiAvantAction();
-        }
-        await sleep(delay);
-      }
+      const delay = this.cfg.agent.humanize ? delaiAvantAction() : 0;
+      await sleep(delay);
       // Si le bot s'est déconnecté pendant l'attente, on abandonne l'action.
       if (this.bot !== bot || !bot.entity) {
         this.logger.write('errors', { agent: this.username, decision_id: decisionId, message: 'action annulée : bot déconnecté pendant la décision' });
@@ -320,21 +407,14 @@ class Agent {
         agent: this.username, decision_id: decisionId, tool: choice.name, args,
         ok: res.ok, result: res.result, humanize_delay_ms: Math.round(delay), duration_ms: Date.now() - tAction,
       });
-      const type = choice.name === 'murmurer' ? 'whisper' : 'chat';
-      if ((choice.name === 'parler' || choice.name === 'murmurer') && res.ok) {
-        this.retenirMessage({ type, from: this.username, to: args.joueur, text: args.message });
-      }
-      // Après une faute de frappe, le joueur envoie parfois la correction ("*mot").
-      if (correction && res.ok) {
-        await sleep(uniform(1500, 3000));
-        bot.chat(choice.name === 'murmurer' ? `/msg ${args.joueur} ${correction}` : correction);
-        this.retenirMessage({ type, from: this.username, to: args.joueur, text: correction });
-        this.logger.write('actions', { agent: this.username, decision_id: decisionId, tool: 'correction', args: { message: correction }, ok: true });
-      }
       enchainer = `ton action ${choice.name} vient de finir (${res.ok ? 'réussie' : 'ratée'})`;
       this.memory.actions.push({ name: choice.name, args, ok: res.ok, result: res.result, t: Date.now() });
       if (this.memory.actions.length > 5) this.memory.actions.shift();
       this.log(`${choice.name} ${JSON.stringify(args)} -> ${res.result}${pensee ? ` [pense : ${pensee}]` : ''}`);
+      // De temps en temps, il dit un mot sur ce qu'il fait (un joueur bavard parle plus souvent).
+      if (this.cfg.agent.humanize && Math.random() < this.style.bavard * 0.1 && Object.keys(bot.players).length > 1) {
+        this.entendre(`rien de spécial, tu viens de faire : ${choice.name} (${res.ok ? 'réussi' : 'raté'}). Dis un petit mot si tu en as envie, sinon ne_rien_dire`);
+      }
     } catch (err) {
       this.logger.write('errors', { agent: this.username, decision_id: decisionId, message: 'décision', detail: err.stack });
     } finally {
@@ -343,6 +423,7 @@ class Agent {
       this.suite(enchainer);
     }
   }
+
 
   // Mission de test (AGENT_MISSION) si elle existe, sinon le premier objectif du profil pas encore atteint.
   etapeDuMoment(bot) {
@@ -389,7 +470,7 @@ class Agent {
         this.logger.write('events', { agent: this.username, type: 'laisse_faire', text: `<${from}> ${text}` });
         return;
       }
-      this.schedule(`message de ${from} à tout le monde`, 0);
+      this.repondre(`message de ${from} à tout le monde : "${text}"`);
     }, delaiReaction(this.coutPourMoi(from, text).cout));
   }
 

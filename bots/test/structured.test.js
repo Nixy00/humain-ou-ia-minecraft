@@ -601,3 +601,28 @@ test('perception : liste de ce qu il peut fabriquer tout de suite', () => {
   const texte = observe(bot, { blocksArray: [] }, { events: [], chat: [], actions: [], notes: [], demandes: [] });
   assert.match(texte, /Tu peux fabriquer maintenant : oak_planks\./);
 });
+
+test('bouche : accepter arrete l action en cours et relance les mains ; ne_rien_dire laisse jouer', async () => {
+  const { Agent } = require('../src/agent/agent');
+  const { Vec3 } = require('vec3');
+  let reponse = { name: 'accepter', arguments: JSON.stringify({ quoi: 'donner du bois a SAHYGO', pensee: 'jai du bois et je suis pas loin' }) };
+  const gateway = { cfg: { model: 'test', toolChoice: 'auto' }, mode: 'tools',
+    chat: async () => ({ message: { role: 'assistant', tool_calls: [{ function: reponse }] }, finishReason: 'tool_calls' }) };
+  const logger = { write() {}, gameId: 'test' };
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: { agent: { humanize: false }, llm: { maxFormatRetries: 0 } }, gateway, logger });
+  a.mcData = {};
+  a.bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: { SAHYGO: {} }, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} }, pathfinder: { setGoal() {} } };
+  const relances = [];
+  a.schedule = (r) => relances.push(r);
+  a.actionEnCours = 'collecter';
+  await a.repondre('message de SAHYGO : "qqun me donne du bois ?"');
+  assert.strictEqual(a.memory.accepte.text, 'donner du bois a SAHYGO');
+  assert.strictEqual(a.bot.interrompre, true);
+  assert.deepStrictEqual(relances, ['tu as accepté : donner du bois a SAHYGO']);
+  a.bot.interrompre = false;
+  reponse = { name: 'ne_rien_dire', arguments: '{}' };
+  await a.repondre('message de SAHYGO : "lol"');
+  assert.strictEqual(a.bot.interrompre, false);
+  assert.strictEqual(relances.length, 1);
+});
