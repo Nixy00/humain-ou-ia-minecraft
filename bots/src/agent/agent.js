@@ -214,6 +214,7 @@ class Agent {
     const bot = this.bot;
     const decisionId = `${this.username}-${++this.seq}`;
     const t0 = Date.now();
+    let enchainer = null;
     try {
       const but = this.recettes && objetDeMission(this.memory.mission, this.mcData);
       this.memory.etape = but ? prochaineEtape(but, bot.inventory.items(), this.recettes) : null;
@@ -289,6 +290,7 @@ class Agent {
         this.retenirMessage({ type, from: this.username, to: args.joueur, text: correction });
         this.logger.write('actions', { agent: this.username, decision_id: decisionId, tool: 'correction', args: { message: correction }, ok: true });
       }
+      enchainer = `ton action ${choice.name} vient de finir (${res.ok ? 'réussie' : 'ratée'})`;
       this.memory.actions.push({ name: choice.name, args, ok: res.ok, result: res.result, t: Date.now() });
       if (this.memory.actions.length > 5) this.memory.actions.shift();
       this.log(`${choice.name} ${JSON.stringify(args)} -> ${res.result}`);
@@ -297,11 +299,20 @@ class Agent {
     } finally {
       this.busy = false;
       this.actionEnCours = null;
-      if (this.pendingReason) {
-        const r = this.pendingReason;
-        this.pendingReason = null;
-        this.schedule(r, 500);
-      }
+      this.suite(enchainer);
+    }
+  }
+
+  // Après une décision : une demande d'un joueur en attente passe d'abord.
+  // Sinon, comme Mindcraft, on enchaîne dès que l'action finit, après une petite pause de joueur
+  // (avant, il attendait la minuterie de 30 s et restait planté après une action de 2 s).
+  suite(enchainer) {
+    if (this.pendingReason) {
+      const r = this.pendingReason;
+      this.pendingReason = null;
+      this.schedule(r, 500);
+    } else if (enchainer && (this.cfg.agent.sansHumain || this.humainConnecte())) {
+      this.schedule(enchainer, uniform(1000, 3000));
     }
   }
 

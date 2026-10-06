@@ -34,7 +34,7 @@ Façon de jouer :
 
 function turnPrompt(observation, reason) {
   // Sans ça, le bot écrivait un message à chaque minuterie (toutes les 20 s) : un joueur parle beaucoup moins.
-  const calme = reason.startsWith('minuterie') ? '\nPersonne ne t\'a parlé : joue (récolte, fabrique, explore, construis), pas besoin de parler.' : '';
+  const calme = reason.startsWith('minuterie') || reason.startsWith('ton action') ?'\nPersonne ne t\'a parlé : joue (récolte, fabrique, explore, construis), pas besoin de parler.' : '';
   return `${observation}\n\nCe tour est déclenché par : ${reason}.${calme}\nQue fais-tu maintenant ?`;
 }
 

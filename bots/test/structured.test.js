@@ -415,3 +415,18 @@ test('plan : prochaine etape vers le casque en diamant selon l inventaire', asyn
   assert.strictEqual(etape({ diamond_helmet: 1 }), null);
   assert.strictEqual(objetDeMission('obtenir un casque en diamant (diamond_helmet)', require('minecraft-data')('1.20.4')), 'diamond_helmet');
 });
+
+test('enchainement : relance apres une action, la demande d un joueur passe avant', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: { agent: { sansHumain: true } }, gateway: {}, logger: {} });
+  const appels = [];
+  a.schedule = (raison, ms) => appels.push([raison, ms]);
+  a.suite('ton action collecter vient de finir (réussie)');
+  assert.strictEqual(appels[0][0], 'ton action collecter vient de finir (réussie)');
+  assert.ok(appels[0][1] >= 1000 && appels[0][1] <= 3000);
+  a.pendingReason = 'SAHYGO te parle';
+  a.suite('ton action collecter vient de finir (réussie)');
+  assert.deepStrictEqual(appels[1], ['SAHYGO te parle', 500]);
+  a.suite(null); // decision ratee : pas de relance (sinon boucle si la passerelle est en panne)
+  assert.strictEqual(appels.length, 2);
+});
