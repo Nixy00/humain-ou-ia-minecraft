@@ -196,9 +196,23 @@ class Agent {
   verifierRepetition(name, args) {
     if (name !== 'parler' && name !== 'murmurer') return [];
     // normalize('NFD') sépare les accents des lettres, puis on ne garde que a-z ("où" devient "ou").
-    const debut = (t) => t.normalize('NFD').toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
-    const derniers = this.memory.actions.filter((a) => a.name === name).slice(-3).map((a) => debut(a.args.message));
-    return derniers.includes(debut(args.message)) ? ['tu as déjà écrit presque la même chose, dis autre chose ou attends'] : [];
+    const mots = (t) => t.normalize('NFD').toLowerCase().replace(/[^a-z ]/g, '').split(' ').filter(Boolean);
+    const nouveaux = mots(args.message);
+    // Mes 3 derniers messages : si presque tous les mots se retrouvent dans l'un d'eux, c'est une répétition
+    // ("tas besoin fer ?" puis "tas toujours besoin fer ?" passaient avec l'ancienne comparaison des 8 premières lettres).
+    const miens = this.memory.chat.filter((m) => m.from === this.username && !m.text.startsWith('*')).slice(-3);
+    const debut = (t) => mots(t).join('').slice(0, 8);
+    const repete = miens.some((m) => {
+      const anciens = mots(m.text);
+      return debut(m.text) === debut(args.message) || nouveaux.filter((w) => anciens.includes(w)).length >= Math.ceil(nouveaux.length * 0.6);
+    });
+    if (repete) return ['tu as déjà écrit presque la même chose, dis autre chose ou attends'];
+    // Reposer une question alors que personne n'a répondu depuis (il relançait les autres bots, occupés, en boucle).
+    const dernier = this.memory.chat[this.memory.chat.length - 1];
+    if (args.message.includes('?') && dernier && dernier.from === this.username && dernier.text.includes('?') && Date.now() - dernier.t < 3 * 60000) {
+      return ["personne n'a répondu à ta question, laisse tomber ou fais autre chose"];
+    }
+    return [];
   }
 
   // Regroupe les évènements rapprochés : une seule décision après `delayMs` de calme.

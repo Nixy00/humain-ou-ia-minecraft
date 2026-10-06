@@ -135,7 +135,7 @@ test('accents : enlevés au hasard selon la probabilité de les garder', () => {
 test('répétition : un message qui commence comme un des derniers est refusé', () => {
   const { Agent } = require('../src/agent/agent');
   const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
-  a.memory.actions.push({ name: 'parler', args: { message: "mdr t'es où gros ?" } });
+  a.memory.chat.push({ from: 'Joueur4', text: "mdr t'es où gros ?", t: Date.now() - 600000 });
   assert.strictEqual(a.verifierRepetition('parler', { message: "mdr t'es ou gros ? je te vois pas" }).length, 1);
   assert.strictEqual(a.verifierRepetition('parler', { message: 'jvais couper du bois' }).length, 0);
 });
@@ -148,7 +148,7 @@ test('écrire comme un joueur : pas de majuscule au début, pas de point final, 
 test('répétition : "wsh tes ou frr" puis "wsh tes ou jte vois pas" est refusé', () => {
   const { Agent } = require('../src/agent/agent');
   const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
-  a.memory.actions.push({ name: 'parler', args: { message: "wsh t'es ou frr ?" } });
+  a.memory.chat.push({ from: 'Joueur4', text: "wsh t'es ou frr ?", t: Date.now() - 600000 });
   assert.strictEqual(a.verifierRepetition('parler', { message: "wsh t'es ou jte vois pas mdr" }).length, 1);
 });
 
@@ -523,4 +523,16 @@ test('perception : evenements identiques regroupes, notes en double affichees un
   assert.strictEqual(texte.split('fuite : skeleton').length, 2);
   assert.ok(texte.includes('(x3)'));
   assert.strictEqual(texte.split('miner pierre').length, 2);
+});
+
+test('repetition : meme idee avec d autres mots, ou question restee sans reponse', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  a.memory.chat.push({ from: 'Joueur4', text: 'tas besoin fer ?', t: Date.now() - 600000 });
+  assert.strictEqual(a.verifierRepetition('parler', { message: 'tas toujours besoin fer ?' }).length, 1);
+  a.memory.chat.push({ from: 'Joueur4', text: 'vous faites quoi', t: Date.now() - 10000 });
+  a.memory.chat.push({ from: 'Joueur4', text: 'qq1 a du bois ?', t: Date.now() - 5000 });
+  assert.match(a.verifierRepetition('parler', { message: 'tu veux du charbon ?' })[0], /personne n'a répondu/);
+  a.memory.chat.push({ from: 'Joueur5', text: 'nan', t: Date.now() });
+  assert.deepStrictEqual(a.verifierRepetition('parler', { message: 'tu veux du charbon ?' }), []);
 });

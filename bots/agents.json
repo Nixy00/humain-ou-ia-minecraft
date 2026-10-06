@@ -6,7 +6,7 @@
     "style": {
       "secondesParLettre": 0.22,
       "bavard": 0.7,
-      "fautes": 0.08,
+      "fautes": 0.05,
       "rateCoup": 0.25,
       "accents": 0.15
     },
