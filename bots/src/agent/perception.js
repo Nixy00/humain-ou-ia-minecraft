@@ -110,10 +110,11 @@ function observe(bot, mcData, memory) {
       : "tu as faim et rien à manger, aucun animal en vue : explorer pour en trouver (ils sont souvent en bas, dans les plaines)");
   }
   if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
+  if (memory.envie) lines.push(`Ce que tu as envie de faire dans cette partie : ${memory.envie}`);
   if (memory.mission) lines.push(`Ta mission : ${memory.mission}`);
   // Une demande d'un joueur passe avant la mission : il continuait à chercher des diamants quand on lui disait "on remonte".
   const demandeRecente = memory.demandes.some((d) => Date.now() - d.t < 2 * 60000);
-  if (memory.etape && !demandeRecente) lines.push(`Prochaine étape pour ta mission (fais-la sauf si on te demande autre chose) : ${memory.etape}`);
+  if (memory.etape && !demandeRecente) lines.push(`Prochaine étape pour avancer (calculée pour toi) : ${memory.etape}`);
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {

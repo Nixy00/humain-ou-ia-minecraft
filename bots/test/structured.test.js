@@ -458,3 +458,17 @@ test('aller vers un joueur trop loin : conseil de demander ses coordonnees', asy
   const { executors } = require('../src/agent/actions');
   await assert.rejects(executors.aller_vers_joueur({ players: { SAHYGO: {} } }, { joueur: 'SAHYGO' }), /coordonnées/);
 });
+
+test('profils : l etape suit le premier objectif pas encore atteint', async () => {
+  const { Agent } = require('../src/agent/agent');
+  const mc = await import('../src/mindcraft/mcdata.mjs');
+  mc.init('1.20.4');
+  const profil = require('../agents.json').find((p) => p.username === 'Joueur5');
+  const a = new Agent(profil, { cfg: { agent: { mission: '' } }, gateway: {}, logger: {} });
+  a.recettes = mc.getItemCraftingRecipes;
+  a.mcData = require('minecraft-data')('1.20.4');
+  const bot = (inv) => ({ inventory: { items: () => Object.entries(inv).map(([name, count]) => ({ name, count })) } });
+  assert.match(a.etapeDuMoment(bot({})), /^collecter oak_log/);
+  assert.strictEqual(a.etapeDuMoment(bot({ stone_sword: 1, stone_pickaxe: 1, iron_ingot: 1, stick: 4, crafting_table: 1 })), 'collecter iron_ore (1), creuser vers y=16 ou chercher une grotte');
+  assert.strictEqual(a.etapeDuMoment(bot({ stone_sword: 1, stone_pickaxe: 1, iron_ingot: 2, stick: 4, crafting_table: 1 })), 'fabriquer iron_sword');
+});

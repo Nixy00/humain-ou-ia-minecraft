@@ -9,6 +9,9 @@ const SOURCES = {
   raw_iron: { bloc: 'iron_ore', outil: 'stone_pickaxe', conseil: 'creuser vers y=16 ou chercher une grotte' },
   iron_ingot: { cuire: 'raw_iron' },
   diamond: { bloc: 'diamond_ore', outil: 'iron_pickaxe', conseil: 'creuser vers y=-58' },
+  beef: { animal: 'cow' },
+  cooked_beef: { cuire: 'beef' },
+  white_wool: { animal: 'sheep' },
 };
 
 // Une pioche plus forte remplace une plus faible.
@@ -46,6 +49,7 @@ function etape(item, n, inv, recettes, profondeur = 0) {
       || etape('furnace', 1, inv, recettes, profondeur + 1)
       || `cuire ${source.cuire} (${manque}), avec du charbon ou du bois`;
   }
+  if (source && source.animal) return `chasser ${source.animal} (${manque} ${item} à avoir)`;
   if (source) {
     if (source.outil) {
       const outil = etape(source.outil, 1, inv, recettes, profondeur + 1);
@@ -75,14 +79,29 @@ function objetDeMission(mission, registry) {
   return mots.find((m) => m.includes('_') && registry.itemsByName[m]) || null;
 }
 
-function prochaineEtape(item, inventaire, recettes) {
+function compter(inventaire) {
   const inv = {};
   for (const i of inventaire) inv[i.name] = (inv[i.name] || 0) + i.count;
-  const texte = etape(item, 1, inv, recettes);
+  return inv;
+}
+
+// Objectifs d'un profil (agents.json), dans l'ordre : le premier qu'il n'a pas encore.
+// Un objectif est un identifiant ("iron_sword") ou { objet, nombre } ("64 planches pour construire").
+function objectifDuMoment(objectifs, inventaire) {
+  const inv = compter(inventaire);
+  for (const o of objectifs || []) {
+    const but = typeof o === 'string' ? { objet: o, nombre: 1 } : o;
+    if (nombre(inv, but.objet) < but.nombre) return but;
+  }
+  return null;
+}
+
+function prochaineEtape(item, inventaire, recettes, combien = 1) {
+  const texte = etape(item, combien, compter(inventaire), recettes);
   // Les recettes sont écrites avec du chêne : avec des bûches de bouleau, il faut des planches de bouleau.
   const buche = inventaire.find((i) => i.name.endsWith('_log') && !i.name.startsWith('stripped'));
   if (texte === 'fabriquer oak_planks' && buche) return `fabriquer ${buche.name.replace('_log', '_planks')}`;
   return texte;
 }
 
-module.exports = { prochaineEtape, objetDeMission };
+module.exports = { prochaineEtape, objetDeMission, objectifDuMoment };

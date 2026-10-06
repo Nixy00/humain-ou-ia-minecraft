@@ -10,22 +10,23 @@ const { TOOLS, execute, checkArgs } = require('./actions');
 const { systemPrompt, turnPrompt, votePrompt } = require('./prompt');
 const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, delaiAvantAction, uniform } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
-const { prochaineEtape, objetDeMission } = require('./plan');
+const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
 const { callTool } = require('../llm/structured');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 
 class Agent {
-  constructor({ username, persona, style }, { cfg, gateway, logger }) {
+  constructor({ username, persona, style, envie, objectifs }, { cfg, gateway, logger }) {
     this.username = username;
     this.persona = persona;
+    this.objectifs = objectifs || [];
     this.style = { ...STYLE_DEFAUT, ...style };
     this.actionEnCours = null;
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null, mission: cfg.agent ? cfg.agent.mission : '' };
+    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], objectif: null, envie: envie || '', mission: cfg.agent ? cfg.agent.mission : '' };
     this.seq = 0;
     this.busy = false;
     this.pendingReason = null;
@@ -221,9 +222,7 @@ class Agent {
     const t0 = Date.now();
     let enchainer = null;
     try {
-      const but = this.recettes && objetDeMission(this.memory.mission, this.mcData);
-      // Mission finie : on le lui dit (sinon il refabriquait un deuxième casque avec ses diamants).
-      this.memory.etape = but ? (prochaineEtape(but, bot.inventory.items(), this.recettes) || `aucune, mission accomplie (tu as ${but}) : ne le refabrique pas, fais ce que tu veux`) : null;
+      this.memory.etape = this.recettes ? this.etapeDuMoment(bot) : null;
       const observation = observe(this.bot, this.mcData, this.memory);
       const choice = await callTool({
         gateway: this.gateway,
@@ -307,6 +306,16 @@ class Agent {
       this.actionEnCours = null;
       this.suite(enchainer);
     }
+  }
+
+  // Mission de test (AGENT_MISSION) si elle existe, sinon le premier objectif du profil pas encore atteint.
+  etapeDuMoment(bot) {
+    const inv = bot.inventory.items();
+    const mission = objetDeMission(this.memory.mission, this.mcData);
+    // Mission finie : on le lui dit (sinon il refabriquait un deuxième casque avec ses diamants).
+    if (mission) return prochaineEtape(mission, inv, this.recettes) || `aucune, mission accomplie (tu as ${mission}) : ne le refabrique pas, fais ce que tu veux`;
+    const but = objectifDuMoment(this.objectifs, inv);
+    return but ? prochaineEtape(but.objet, inv, this.recettes, but.nombre) : null;
   }
 
   // Après une décision : une demande d'un joueur en attente passe d'abord.

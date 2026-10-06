@@ -36,7 +36,7 @@ const TOOLS = [
   tool('donner', "Aller vers un joueur et lui lancer des objets de ton inventaire (troc).", { joueur: JOUEUR, objet: ID_MC, quantite: { type: 'integer', minimum: 1, maximum: 64 } }, ['joueur', 'objet', 'quantite']),
   tool('manger', 'Manger de la nourriture de ton inventaire.', {}),
   tool('se_defendre', 'Attaquer le monstre hostile le plus proche (jamais un joueur).', {}),
-  tool('chasser', 'Tuer un animal proche pour sa viande (vache, cochon, poulet, mouton, lapin) et la ramasser.', {}),
+  tool('chasser', 'Tuer un animal proche (vache, cochon, poulet, mouton, lapin) et ramasser ce qui tombe. animal (optionnel) = cow, sheep...', { animal: { type: 'string', maxLength: 16 } }),
   tool('explorer', 'Partir explorer plus loin (30 à 60 blocs, en gardant à peu près la même direction) pour trouver des ressources ou des animaux.', {}),
   tool('attendre', 'Ne rien faire pendant quelques secondes.', { secondes: { type: 'integer', minimum: 1, maximum: 30 } }, ['secondes']),
   tool('aller_a', 'Marcher jusqu\'à des coordonnées.', { x: COORD, y: COORD, z: COORD }, ['x', 'y', 'z']),
@@ -157,8 +157,10 @@ const executors = {
   },
 
   async chasser(bot, args, { style }) {
-    const animal = bot.nearestEntity((e) => ANIMAUX.includes(e.name) && bot.entity.position.distanceTo(e.position) < 48);
-    if (!animal) throw new Error('aucun animal à moins de 48 blocs, explore plus loin dans une direction');
+    // animal précis (ex. sheep pour la laine d'un lit), sinon le plus proche.
+    const voulu = (e) => (args.animal ? e.name === args.animal : ANIMAUX.includes(e.name));
+    const animal = bot.nearestEntity((e) => voulu(e) && bot.entity.position.distanceTo(e.position) < 48);
+    if (!animal) throw new Error(`aucun ${args.animal || 'animal'} à moins de 48 blocs, explore plus loin dans une direction`);
     const arme = bot.inventory.items().find((i) => i.name.endsWith('_sword')) ?? bot.inventory.items().find((i) => i.name.endsWith('_axe'));
     if (arme) await bot.equip(arme, 'hand');
     bot.pathfinder.setGoal(new goals.GoalFollow(animal, 1), true);
