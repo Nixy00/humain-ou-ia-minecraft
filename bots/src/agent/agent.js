@@ -10,6 +10,7 @@ const { TOOLS, execute, checkArgs } = require('./actions');
 const { systemPrompt, turnPrompt, votePrompt } = require('./prompt');
 const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, delaiAvantAction, uniform } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
+const { prochaineEtape, objetDeMission } = require('./plan');
 const { callTool } = require('../llm/structured');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -54,6 +55,11 @@ class Agent {
     bot.once('spawn', () => {
       this.reconnectDelay = 5000;
       this.mcData = minecraftData(bot.version);
+      // Recettes de Mindcraft, pour calculer la prochaine étape de la mission (plan.js).
+      import('../mindcraft/mcdata.mjs').then((mc) => {
+        mc.init(bot.version);
+        this.recettes = mc.getItemCraftingRecipes;
+      });
       this.ouvrirVue(bot);
       const moves = new Movements(bot);
       moves.canDig = false; // on ne casse pas de blocs pour se déplacer (constructions des autres)
@@ -209,6 +215,8 @@ class Agent {
     const decisionId = `${this.username}-${++this.seq}`;
     const t0 = Date.now();
     try {
+      const but = this.recettes && objetDeMission(this.memory.mission, this.mcData);
+      this.memory.etape = but ? prochaineEtape(but, bot.inventory.items(), this.recettes) : null;
       const observation = observe(this.bot, this.mcData, this.memory);
       const choice = await callTool({
         gateway: this.gateway,

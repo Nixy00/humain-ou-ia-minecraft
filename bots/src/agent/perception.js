@@ -111,6 +111,7 @@ function observe(bot, mcData, memory) {
   }
   if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
   if (memory.mission) lines.push(`Ta mission : ${memory.mission}`);
+  if (memory.etape) lines.push(`Prochaine étape pour ta mission (fais-la sauf si on te demande autre chose) : ${memory.etape}`);
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {

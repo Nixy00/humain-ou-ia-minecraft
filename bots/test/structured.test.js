@@ -399,3 +399,19 @@ test('perception : pioche cassee et de la cobble -> idee de pioche en pierre', (
   assert.ok(texte.includes('fabriquer stone_pickaxe'));
   assert.ok(!texte.includes('wooden_pickaxe'));
 });
+
+test('plan : prochaine etape vers le casque en diamant selon l inventaire', async () => {
+  const { prochaineEtape, objetDeMission } = require('../src/agent/plan');
+  const mc = await import('../src/mindcraft/mcdata.mjs');
+  mc.init('1.20.4');
+  const etape = (inv) => prochaineEtape('diamond_helmet', Object.entries(inv).map(([name, count]) => ({ name, count })), mc.getItemCraftingRecipes);
+  assert.match(etape({}), /^collecter oak_log/);
+  assert.strictEqual(etape({ birch_log: 3 }), 'fabriquer birch_planks');
+  assert.match(etape({ wooden_pickaxe: 1, stick: 4, oak_planks: 4 }), /^collecter stone/);
+  assert.match(etape({ stone_pickaxe: 1, crafting_table: 1 }), /^collecter iron_ore/);
+  assert.match(etape({ stone_pickaxe: 1, raw_iron: 3, furnace: 1, crafting_table: 1 }), /^cuire raw_iron/);
+  assert.match(etape({ iron_pickaxe: 1, crafting_table: 1 }), /^collecter diamond_ore/);
+  assert.strictEqual(etape({ iron_pickaxe: 1, diamond: 5, crafting_table: 1 }), 'fabriquer diamond_helmet');
+  assert.strictEqual(etape({ diamond_helmet: 1 }), null);
+  assert.strictEqual(objetDeMission('obtenir un casque en diamant (diamond_helmet)', require('minecraft-data')('1.20.4')), 'diamond_helmet');
+});
