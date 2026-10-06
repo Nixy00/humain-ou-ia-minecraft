@@ -12,6 +12,7 @@ const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverA
 const { startReflexes } = require('./reflexes');
 const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
 const { NB_BLOCS } = require('./construction');
+const { objetDemande, coutDemande, delaiReaction, dejaRepondu } = require('./demandes');
 const { callTool } = require('../llm/structured');
 
 const HUMEURS = ['motivé', 'normal', 'normal', 'un peu fatigué', 'de bonne humeur'];
@@ -95,11 +96,12 @@ class Agent {
       const seulsTousLesDeux = Object.keys(bot.players).length <= 2;
       // Un message à tout le monde ("vous", "qq1", "allo y'a quelqu'un") le concerne aussi :
       // pendant un test, "bande de fou allez me chercher..." et "vous pouvez parler ???" n'ont eu aucune réponse.
-      const pourTous = /(vous|tout le monde|qq1|quelqu'un|quelquun|personne|les gars)/i.test(text);
-      const pourMoi = seulsTousLesDeux || pourTous || text.toLowerCase().includes(this.username.toLowerCase());
+      const nomme = text.toLowerCase().includes(this.username.toLowerCase());
+      const pourTous = !seulsTousLesDeux && !nomme && /(vous|tout le monde|qq1|qqun|quelqu'un|quelquun|personne|les gars)/i.test(text);
+      const pourMoi = seulsTousLesDeux || nomme || pourTous;
       const reagir = pourMoi || !this.cfg.agent.humanize || Math.random() < this.style.bavard;
       // Quelqu'un lui parle : comme un joueur, il s'arrête dans ce qu'il fait pour répondre.
-      if (pourMoi && this.actionEnCours) {
+      if (pourMoi && !pourTous && this.actionEnCours) {
         bot.interrompre = true;
         bot.pathfinder.setGoal(null);
       }
@@ -108,8 +110,13 @@ class Agent {
         // On ne garde que le dernier message de chaque joueur : "envoie 2 diams" restait affiché 10 min
         // après "non tkt merci", et il renvoyait des diamants en boucle.
         this.memory.demandes = this.memory.demandes.filter((d) => d.from !== from);
-        this.memory.demandes.push({ from, text, t: Date.now() });
+        this.memory.demandes.push({ from, text, t: Date.now(), info: pourTous ? this.infoDemande(from, text) : '' });
         if (this.memory.demandes.length > 3) this.memory.demandes.shift();
+      }
+      if (pourTous) {
+        this.onEvent({ type: 'chat', from, text }, null);
+        this.reagirPlusTard(from, text);
+        return;
       }
       this.onEvent({ type: 'chat', from, text }, reagir ? `message de ${from}` : null);
     });
@@ -353,6 +360,37 @@ class Agent {
       return (planches > 0 && prochaineEtape('oak_planks', inv, this.recettes, planches)) || 'construire (ta cabane)';
     }
     return prochaineEtape(but.objet, inv, this.recettes, but.nombre);
+  }
+
+  // Ce que la demande me coûterait (demandes.js) : sert au délai, et affiché au modèle pour qu'il décide.
+  coutPourMoi(from, text) {
+    const bot = this.bot;
+    const joueur = bot.players[from] && bot.players[from].entity;
+    const possede = objetDemande(text, bot.inventory.items(), bot.registry);
+    const distance = joueur ? Math.round(bot.entity.position.distanceTo(joueur.position)) : null;
+    return { possede, distance, cout: coutDemande({ possede, distance, occupe: Boolean(this.actionEnCours), serviable: this.caractere.serviable }) };
+  }
+
+  infoDemande(from, text) {
+    const { possede, distance } = this.coutPourMoi(from, text);
+    const objet = possede === null ? '' : (possede > 0 ? `, tu en as ${possede}` : ", tu n'en as pas");
+    return ` (à tout le monde${objet}, ${distance === null ? 'tu ne le vois pas' : `il est à ${distance} blocs`})`;
+  }
+
+  // Demande à tout le monde : plus ça me coûte, plus j'attends avant de réagir. Si un autre joueur a répondu
+  // entre-temps, je le laisse faire sans appeler le modèle (comme un humain qui lit "jen ai" dans le chat).
+  reagirPlusTard(from, text) {
+    const bot = this.bot;
+    const depuis = Date.now();
+    setTimeout(() => {
+      if (this.bot !== bot || !bot.entity) return;
+      if (dejaRepondu(this.memory.chat, from, depuis, this.username)) {
+        this.memory.demandes = this.memory.demandes.filter((d) => !(d.from === from && d.text === text));
+        this.logger.write('events', { agent: this.username, type: 'laisse_faire', text: `<${from}> ${text}` });
+        return;
+      }
+      this.schedule(`message de ${from} à tout le monde`, 0);
+    }, delaiReaction(this.coutPourMoi(from, text).cout));
   }
 
   // La même action avec les mêmes arguments a raté 2 fois de suite : on refuse la 3e

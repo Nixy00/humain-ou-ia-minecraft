@@ -117,7 +117,7 @@ function observe(bot, mcData, memory) {
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {
     lines.push('', "Ce qu'on t'a demandé récemment (à toi de voir selon ton caractère et ce que tu fais : maintenant, plus tard ou non) :");
-    for (const d of demandes) lines.push(`- [${agoText(d.t)}] <${d.from}> ${d.text}`);
+    for (const d of demandes) lines.push(`- [${agoText(d.t)}] <${d.from}> ${d.text}${d.info || ''}`);
   }
   const promesses = (memory.promesses || []).filter((p) => Date.now() - p.t < 20 * 60000);
   if (promesses.length > 0) {

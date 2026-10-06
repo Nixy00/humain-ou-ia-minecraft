@@ -570,3 +570,20 @@ test('meme action ratee 2 fois : la 3e est refusee ; message a tout le monde = p
   const { turnPrompt } = require('../src/agent/prompt');
   assert.ok(!turnPrompt('obs', 'ton action collecter vient de finir (réussie)', true).includes("Personne ne t'a parlé"));
 });
+
+test('demande a tout le monde : le bot a qui ca coute le moins reagit en premier, les autres laissent faire', () => {
+  const { objetDemande, coutDemande, delaiReaction, dejaRepondu } = require('../src/agent/demandes');
+  const registry = require('minecraft-data')('1.20.4');
+  assert.strictEqual(objetDemande('qqun a de la laine ?', [{ name: 'white_wool', count: 3 }], registry), 3);
+  assert.strictEqual(objetDemande('qqun a de la laine ?', [{ name: 'dirt', count: 3 }], registry), 0);
+  assert.strictEqual(objetDemande('vous faites quoi', [], registry), null);
+  // Exemple du document docs/reactions-des-bots.md
+  const chill = coutDemande({ possede: 3, distance: 10, occupe: false, serviable: 0.8 });
+  const rusher = coutDemande({ possede: 0, distance: 40, occupe: true, serviable: 0.3 });
+  const builder = coutDemande({ possede: 0, distance: null, occupe: true, serviable: 0.5 });
+  assert.ok(Math.abs(chill - 0.9) < 1e-9 && Math.abs(rusher - 6.4) < 1e-9 && Math.abs(builder - 5.5) < 1e-9);
+  assert.ok(delaiReaction(chill) < delaiReaction(builder) && delaiReaction(builder) < delaiReaction(rusher));
+  const t = Date.now();
+  assert.ok(dejaRepondu([{ from: 'Joueur4', text: 'jen ai tiens', t: t + 3000 }], 'SAHYGO', t, 'Joueur5'));
+  assert.ok(!dejaRepondu([{ from: 'SAHYGO', text: 'allo ?', t: t + 3000 }], 'SAHYGO', t, 'Joueur5'));
+});
