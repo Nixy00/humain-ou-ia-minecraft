@@ -122,6 +122,8 @@ const executors = {
   },
 
   async aller_vers_joueur(bot, { joueur }) {
+    // Il réessayait 6 fois de suite "Could not find SAHYGO" alors que le joueur était juste trop loin.
+    if (!bot.players[joueur].entity) throw new Error(`${joueur} est trop loin pour que tu le voies : demande-lui ses coordonnées puis utilise aller_a`);
     return mindcraft(bot, 'goToPlayer', joueur, 2);
   },
 
@@ -270,7 +272,23 @@ const executors = {
   },
 
   async remonter(bot) {
-    return mindcraft(bot, 'goToSurface');
+    // goToSurface de Mindcraft vise directement la surface (100 blocs plus haut) : trop loin pour la
+    // recherche de chemin (limitée à 96 blocs). On monte donc par paliers de 30 blocs.
+    const p = bot.entity.position;
+    let surface = Math.floor(p.y);
+    for (let y = 320; y > p.y; y--) {
+      const b = bot.blockAt(new Vec3(p.x, y, p.z));
+      if (b && !['air', 'cave_air', 'void_air'].includes(b.name)) {
+        surface = y + 1;
+        break;
+      }
+    }
+    while (bot.entity.position.y < surface - 1 && !bot.interrompre) {
+      const avant = bot.entity.position.y;
+      await mindcraft(bot, 'goToGoal', new goals.GoalY(Math.min(surface, Math.floor(avant) + 30)));
+      if (bot.entity.position.y <= avant) throw new Error('impossible de monter plus haut ici');
+    }
+    return `tu es remonté (y=${Math.round(bot.entity.position.y)})`;
   },
 };
 

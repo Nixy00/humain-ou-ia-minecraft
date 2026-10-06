@@ -66,7 +66,7 @@ function observe(bot, mcData, memory) {
   const moment = tod < 12300 || tod > 23850 ? 'jour' : 'nuit';
 
   const lines = [
-    `Toi : ${bot.username}. Vie ${round(bot.health)}/20, faim ${round(bot.food)}/20. Position x=${round(me.x)} y=${round(me.y)} z=${round(me.z)}. Il fait ${moment}.`,
+    `Toi : ${bot.username}. Vie ${round(bot.health)}/20, faim ${round(bot.food)}/20. Position x=${round(me.x)} y=${round(me.y)} z=${round(me.z)}${me.y < 50 ? ' (sous terre, loin de la surface)' : ''}. Il fait ${moment}.`,
     `Inventaire : ${inventorySummary(bot)}.`,
     `Joueurs connectés : ${others.map((p) => p.username).join(', ') || 'aucun'}.`,
     `Joueurs visibles : ${visible.join(', ') || 'aucun'}.`,
@@ -111,7 +111,9 @@ function observe(bot, mcData, memory) {
   }
   if (idees.length > 0) lines.push(`Idées : ${idees.join(' ; ')}.`);
   if (memory.mission) lines.push(`Ta mission : ${memory.mission}`);
-  if (memory.etape) lines.push(`Prochaine étape pour ta mission (fais-la sauf si on te demande autre chose) : ${memory.etape}`);
+  // Une demande d'un joueur passe avant la mission : il continuait à chercher des diamants quand on lui disait "on remonte".
+  const demandeRecente = memory.demandes.some((d) => Date.now() - d.t < 2 * 60000);
+  if (memory.etape && !demandeRecente) lines.push(`Prochaine étape pour ta mission (fais-la sauf si on te demande autre chose) : ${memory.etape}`);
   if (memory.objectif) lines.push(`Ton objectif noté : ${memory.objectif}`);
   const demandes = memory.demandes.filter((d) => Date.now() - d.t < 10 * 60000);
   if (demandes.length > 0) {

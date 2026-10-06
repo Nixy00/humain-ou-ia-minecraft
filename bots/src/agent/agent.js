@@ -95,6 +95,9 @@ class Agent {
       }
       // Ce qu'on lui demande reste affiché à part (le modèle n'utilisait jamais son carnet tout seul).
       if (pourMoi) {
+        // On ne garde que le dernier message de chaque joueur : "envoie 2 diams" restait affiché 10 min
+        // après "non tkt merci", et il renvoyait des diamants en boucle.
+        this.memory.demandes = this.memory.demandes.filter((d) => d.from !== from);
         this.memory.demandes.push({ from, text, t: Date.now() });
         if (this.memory.demandes.length > 3) this.memory.demandes.shift();
       }

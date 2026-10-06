@@ -442,3 +442,19 @@ test('fabriquer plusieurs objets : une fabrication a la fois (bug d inventaire s
   await executors.fabriquer(bot, { objet: 'stick', quantite: 4 });
   assert.deepStrictEqual(appels, [1, 1, 1, 1]);
 });
+
+test('demandes : un nouveau message du meme joueur remplace l ancien, et passe avant la mission', () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const memory = { events: [], chat: [], actions: [], notes: [], demandes: [{ from: 'SAHYGO', text: 'on remonte', t: Date.now() }], objectif: null, etape: 'collecter diamond_ore (5)' };
+  const bot = { username: 'Joueur4', entity: { position: new Vec3(0, -50, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+  const texte = observe(bot, { blocksArray: [] }, memory);
+  assert.ok(!texte.includes('Prochaine étape'));
+  assert.ok(texte.includes('sous terre'));
+});
+
+test('aller vers un joueur trop loin : conseil de demander ses coordonnees', async () => {
+  const { executors } = require('../src/agent/actions');
+  await assert.rejects(executors.aller_vers_joueur({ players: { SAHYGO: {} } }, { joueur: 'SAHYGO' }), /coordonnées/);
+});
