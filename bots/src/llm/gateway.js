@@ -55,11 +55,15 @@ class Gateway {
     this.cfg = cfg;
     this.fetch = fetchImpl;
     this.limiter = new RateLimiter(cfg.maxConcurrent, cfg.minIntervalMs);
+    this.tokensUtilises = 0;
   }
 
   // Envoie une requête et renvoie la réponse + les mesures (latence, jetons, coût).
   // `metadata` est transmis à LiteLLM, qui le relaie à Langfuse s'il est configuré.
   async chat(body, metadata = {}) {
+    if (this.cfg.budgetTokens && this.tokensUtilises >= this.cfg.budgetTokens) {
+      throw new GatewayError(`limite de ${this.cfg.budgetTokens} tokens atteinte (LLM_BUDGET_TOKENS)`);
+    }
     const payload = {
       model: this.cfg.model,
       temperature: this.cfg.temperature,
@@ -72,6 +76,7 @@ class Gateway {
       attempt++;
       try {
         const res = await this.limiter.run(() => this._once(payload));
+        this.tokensUtilises += (res.usage && res.usage.total_tokens) || 0;
         return { ...res, attempts: attempt };
       } catch (err) {
         if (!(err instanceof GatewayError) || !err.retryable || attempt > this.cfg.maxRetries) {

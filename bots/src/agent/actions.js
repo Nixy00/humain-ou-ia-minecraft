@@ -39,6 +39,7 @@ const TOOLS = [
   tool('donner', "Aller vers un joueur et lui lancer des objets de ton inventaire (troc).", { joueur: JOUEUR, objet: ID_MC, quantite: { type: 'integer', minimum: 1, maximum: 64 } }, ['joueur', 'objet', 'quantite']),
   tool('manger', 'Manger de la nourriture de ton inventaire.', {}),
   tool('se_defendre', 'Attaquer le monstre hostile le plus proche (jamais un joueur).', {}),
+  tool('combattre', "Te battre contre un joueur (seulement s'il t'a frappé ou si vous êtes d'accord pour un duel).", { joueur: JOUEUR }, ['joueur']),
   tool('chasser', 'Tuer un animal proche (vache, cochon, poulet, mouton, lapin) et ramasser ce qui tombe. animal (optionnel) = cow, sheep...', { animal: { type: 'string', maxLength: 16 } }),
   tool('explorer', 'Partir explorer plus loin (30 à 60 blocs, en gardant à peu près la même direction) pour trouver des ressources ou des animaux.', {}),
   tool('attendre', 'Ne rien faire pendant quelques secondes.', { secondes: { type: 'integer', minimum: 1, maximum: 30 } }, ['secondes']),
@@ -191,6 +192,29 @@ const executors = {
     // Ramasser ce qui est tombé (viande, cuir, laine...) : dans un test il tuait le poulet sans prendre la viande.
     await sleep(500);
     return `${animal.name} tué. ${await mindcraft(bot, 'pickupNearbyItems')}`;
+  },
+
+  // Combat contre un joueur, comme contre un monstre : temps de réaction, coups ratés, rythme irrégulier.
+  // Il arrête au bout de 15 s, si le joueur s'éloigne, ou s'il a trop peu de vie (il fuit alors).
+  async combattre(bot, { joueur }, { style }) {
+    const cible = playerEntity(bot, joueur);
+    const arme = bot.inventory.items().find((i) => i.name.endsWith('_sword')) ?? bot.inventory.items().find((i) => i.name.endsWith('_axe'));
+    if (arme) await bot.equip(arme, 'hand');
+    bot.pathfinder.setGoal(new goals.GoalFollow(cible, 2), true);
+    const fin = Date.now() + 15000;
+    let coups = 0;
+    while (cible.isValid && Date.now() < fin && !bot.interrompre && bot.health > 6) {
+      const d = bot.entity.position.distanceTo(cible.position);
+      if (d > 16) break;
+      if (d < 3.5) {
+        frapper(bot, cible, style.rateCoup);
+        coups++;
+      }
+      await sleep(delaiEntreCoups());
+    }
+    bot.pathfinder.setGoal(null);
+    if (bot.health <= 6) throw new Error(`tu as presque plus de vie (${Math.round(bot.health)}), fuis !`);
+    return `${coups} coups portés à ${joueur}${cible.isValid ? '' : ', il est mort ou parti'}`;
   },
 
   async se_defendre(bot, args, { style }) {
@@ -463,10 +487,12 @@ function outilsUtiles(bot) {
   // chasser échouait 84 % du temps (aucun animal autour), construire 88 % (plus de blocs) : on ne les propose plus dans ces cas.
   const animal = bot.nearestEntity((e) => ANIMAUX.includes(e.name) && pos.distanceTo(e.position) < 48);
   const blocs = bot.inventory.items().some((i) => i.name === 'cobblestone' || i.name.endsWith('_planks'));
+  const joueurProche = Object.values(bot.players).some((p) => p.username !== bot.username && p.entity && pos.distanceTo(p.entity.position) < 16);
   return TOOLS.filter((t) => !(
     (!aManger && t.name === 'manger')
     || (!animal && t.name === 'chasser')
     || (!blocs && t.name === 'construire')
+    || (!joueurProche && t.name === 'combattre')
     || (!autres && OUTILS_JOUEURS.includes(t.name))
     || (!coffre && OUTILS_COFFRE.includes(t.name))
     || (!monstre && OUTILS_COMBAT.includes(t.name))

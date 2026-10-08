@@ -666,3 +666,25 @@ test('inventaire plein : idee de jeter ; porc et poulet : chasser puis cuire', a
   mc.init('1.20.4');
   assert.match(prochaineEtape('cooked_porkchop', [], mc.getItemCraftingRecipes), /^chasser pig/);
 });
+
+test('limite de tokens : plus aucun appel au modele une fois la limite atteinte', async () => {
+  const { Gateway } = require('../src/llm/gateway');
+  let appels = 0;
+  const fetchImpl = async () => { appels++; return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }], usage: { total_tokens: 600 } }) }; };
+  const g = new Gateway({ model: 'test', baseUrl: 'http://x', maxConcurrent: 1, minIntervalMs: 0, maxRetries: 0, timeoutMs: 1000, budgetTokens: 1000 }, { fetchImpl });
+  await g.chat({ messages: [] });
+  await g.chat({ messages: [] });
+  await assert.rejects(g.chat({ messages: [] }), /limite de 1000 tokens/);
+  assert.strictEqual(appels, 2);
+});
+
+test('combat contre un joueur : seulement s il m a frappe ou si un duel est propose', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur5', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  assert.match(a.verifierCombat('combattre', { joueur: 'SAHYGO' })[0], /duel/);
+  a.frappePar.SAHYGO = Date.now();
+  assert.deepStrictEqual(a.verifierCombat('combattre', { joueur: 'SAHYGO' }), []);
+  a.memory.chat.push({ from: 'Joueur4', text: 'joueur6 1v1 ?', t: Date.now() });
+  assert.deepStrictEqual(a.verifierCombat('combattre', { joueur: 'Joueur4' }), []);
+  assert.strictEqual(a.verifierCombat('combattre', { joueur: 'Joueur6' }).length, 0);
+});

@@ -38,6 +38,8 @@ class Agent {
     this.pense = false; // le cerveau est en train de décider
     this.numeroAction = 0; // pour savoir si l'action qui finit a été remplacée par une autre
     this.pendingReason = null;
+    this.frappePar = {}; // joueur -> dernière fois qu'il m'a frappé
+    this.dejaVu = {}; // joueur -> dernière fois que je l'ai remarqué près de moi
     this.stopping = false;
     this.reconnectDelay = 5000;
   }
@@ -92,6 +94,20 @@ class Agent {
         if (this.cfg.agent.sansHumain || this.humainConnecte()) this.reflechir();
       }, 180000);
       this.schedule('tu viens de te connecter', uniform(3000, 8000));
+      // Il remarque un joueur qui arrive près de lui (une fois toutes les 3 min au plus par joueur).
+      this.vuTimer = setInterval(() => this.remarquerJoueurs(), 2000);
+    });
+
+    // Qui l'a frappé : le joueur le plus proche qui vient de donner un coup (Mineflayer ne donne pas l'attaquant).
+    this.gestes = {};
+    bot.on('entitySwingArm', (e) => { if (e.type === 'player') this.gestes[e.username] = Date.now(); });
+    bot.on('entityHurt', (e) => {
+      if (e !== bot.entity) return;
+      const frappeur = Object.values(bot.players).find((p) => p.username !== this.username && p.entity
+        && p.entity.position.distanceTo(bot.entity.position) < 5 && Date.now() - (this.gestes[p.username] || 0) < 800);
+      if (!frappeur) return;
+      this.frappePar[frappeur.username] = Date.now();
+      this.onEvent({ type: 'frappe', text: `${frappeur.username} t'a frappé (vie ${Math.round(bot.health)}/20)` }, `${frappeur.username} vient de te frapper`);
     });
 
     bot.on('chat', (from, text) => {
@@ -203,6 +219,30 @@ class Agent {
 
   humainConnecte() {
     return Object.keys(this.bot.players).some((nom) => !this.cfg.game.agents.includes(nom));
+  }
+
+  // Un joueur arrive à côté : un humain le remarque (le salue, l'ignore, se méfie...). Le cerveau décide.
+  remarquerJoueurs() {
+    const bot = this.bot;
+    if (!bot || !bot.entity || (!this.cfg.agent.sansHumain && !this.humainConnecte())) return;
+    for (const p of Object.values(bot.players)) {
+      if (p.username === this.username || !p.entity) continue;
+      const d = bot.entity.position.distanceTo(p.entity.position);
+      if (d < 12 && Date.now() - (this.dejaVu[p.username] || 0) > 180000) {
+        this.dejaVu[p.username] = Date.now();
+        this.onEvent({ type: 'joueur', text: `${p.username} arrive près de toi (${Math.round(d)} blocs)` }, `${p.username} arrive près de toi`);
+      }
+    }
+  }
+
+  // Pas de combat contre un joueur sans raison : seulement s'il m'a frappé (2 dernières minutes)
+  // ou si un duel a été proposé dans le chat. Un bot qui tape les humains au hasard gâcherait l'expérience.
+  verifierCombat(name, args) {
+    if (name !== 'combattre') return [];
+    const frappe = Date.now() - (this.frappePar[args.joueur] || 0) < 120000;
+    const duel = this.memory.chat.some((m) => Date.now() - m.t < 120000 && /duel|1v1|combat|bagarre|pvp|fight/i.test(m.text)
+      && (m.from === args.joueur || m.text.toLowerCase().includes(String(args.joueur).toLowerCase())));
+    return frappe || duel ? [] : [`${args.joueur} ne t'a pas frappé et aucun duel n'est prévu : propose un duel dans le chat d'abord (dire)`];
   }
 
   // Un joueur ne renvoie pas trois fois le même message : on refuse un message
@@ -368,7 +408,7 @@ class Agent {
         ],
         tools: outilsUtiles(bot),
         meta: { agent: this.username, decisionId, kind: 'decision' },
-        extraCheck: (name, args) => [...checkArgs(bot, name, args), ...this.verifierRepetition(name, args), ...this.verifierEchecs(name, args)],
+        extraCheck: (name, args) => [...checkArgs(bot, name, args), ...this.verifierRepetition(name, args), ...this.verifierEchecs(name, args), ...this.verifierCombat(name, args)],
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
       });
       const llmMs = Date.now() - t0;
@@ -593,6 +633,7 @@ class Agent {
     clearInterval(this.reflexTimer);
     clearInterval(this.etatTimer);
     clearInterval(this.reflexionTimer);
+    clearInterval(this.vuTimer);
     clearTimeout(this.decideTimer);
     this.raisonPrevue = null;
     this.mcData = null;

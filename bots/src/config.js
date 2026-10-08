@@ -46,6 +46,9 @@ module.exports = {
     // Limitation du débit, partagée par tous les agents du processus.
     maxConcurrent: envInt('LLM_MAX_CONCURRENT', 1),
     minIntervalMs: envInt('LLM_MIN_INTERVAL_MS', 1500),
+    // Limite de tokens pour toute la partie (0 = pas de limite). Au-delà, plus aucun appel au modèle :
+    // les bots restent connectés avec leurs réflexes. Sécurité pour une nuit en autonomie.
+    budgetTokens: envInt('LLM_BUDGET_TOKENS', 0),
   },
   game: {
     id: gameId,
