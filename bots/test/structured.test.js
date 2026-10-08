@@ -650,3 +650,15 @@ test('reflexion : resume, avis, intention et defi adopte devient l etape suivant
   a.etapeDuMoment(a.bot);
   assert.strictEqual(a.memory.objectifPerso, null); // objectif atteint : on revient au profil
 });
+
+test('inventaire plein : idee de jeter ; porc et poulet : chasser puis cuire', async () => {
+  const { observe } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const bot = { username: 'Joueur5', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [{ name: 'cobblestone', count: 64 }], emptySlotCount: () => 1 }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+  assert.match(observe(bot, { blocksArray: [] }, { events: [], chat: [], actions: [], notes: [], demandes: [] }), /presque plein/);
+  const { prochaineEtape } = require('../src/agent/plan');
+  const mc = await import('../src/mindcraft/mcdata.mjs');
+  mc.init('1.20.4');
+  assert.match(prochaineEtape('cooked_porkchop', [], mc.getItemCraftingRecipes), /^chasser pig/);
+});

@@ -12,6 +12,12 @@ const SOURCES = {
   beef: { animal: 'cow' },
   cooked_beef: { cuire: 'beef' },
   white_wool: { animal: 'sheep' },
+  porkchop: { animal: 'pig' },
+  cooked_porkchop: { cuire: 'porkchop' },
+  chicken: { animal: 'chicken' },
+  cooked_chicken: { cuire: 'chicken' },
+  mutton: { animal: 'sheep' },
+  cooked_mutton: { cuire: 'mutton' },
 };
 
 // Une pioche plus forte remplace une plus faible.

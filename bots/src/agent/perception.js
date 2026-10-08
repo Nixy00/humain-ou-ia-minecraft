@@ -123,6 +123,10 @@ function observe(bot, mcData, memory) {
       ? "tu n'as plus de pioche : fabriquer stone_pickaxe (3 cobblestone + 2 stick)"
       : 'tu as de la cobblestone : fabriquer stone_pickaxe, elle mine le fer');
   }
+  // Inventaire plein : il ne ramasse plus rien et ne comprenait pas pourquoi ("impossible de miner du charbon").
+  if (bot.inventory.emptySlotCount && bot.inventory.emptySlotCount() <= 2) {
+    idees.push("ton inventaire est presque plein, tu ne ramasses plus rien : jette ce qui ne sert pas (jeter cobblestone, dirt...)");
+  }
   if (nb('_log') >= 32) idees.push('tu as déjà beaucoup de bois, fais autre chose avec');
   if (bot.food <= 14 && !aManger) {
     idees.push(animaux.length > 0
