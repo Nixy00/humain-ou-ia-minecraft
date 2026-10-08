@@ -24,8 +24,8 @@ for (const d of lire('decisions.jsonl')) {
     lignes.push([d.ts, `${d.agent} | RÉFLEXION : ${r.resume}\n           intention : ${r.intention}${r.nouvel_objectif ? ` (objectif : ${r.nouvel_objectif})` : ''}${avis}`]);
     continue;
   }
-  const qui = d.kind === 'bouche' ? 'BOUCHE' : 'mains';
-  lignes.push([d.ts, `${d.agent} (${qui}) | ${d.reason} -> ${d.tool} ${JSON.stringify(d.args)}${d.pensee ? `\n           pense : ${d.pensee}` : ''}`]);
+  const dit = d.dire ? `\n           dit : "${d.dire}"` : '';
+  lignes.push([d.ts, `${d.agent} | ${d.reason} -> ${d.tool} ${JSON.stringify(d.args)}${dit}${d.pensee ? `\n           pense : ${d.pensee}` : ''}`]);
 }
 // Les messages des joueurs, pour comprendre à quoi le bot réagit (une seule fois chacun).
 const vus = new Set();

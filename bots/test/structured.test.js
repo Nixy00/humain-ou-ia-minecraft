@@ -156,11 +156,11 @@ test('une demande de joueur n\'est pas écrasée par la minuterie', () => {
   const { Agent } = require('../src/agent/agent');
   const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
   a.mcData = {};
-  a.busy = true; // le bot est occupé par une action
+  a.pense = true; // le cerveau est en train de décider
   a.schedule('message de SAHYGO', 0);
   a.schedule('minuterie (rien ne s\'est passé récemment)', 0);
   assert.strictEqual(a.pendingReason, 'message de SAHYGO');
-  a.busy = false; // pas occupé : la décision est prévue dans 1,5 s
+  a.pense = false; // il ne décide pas : la décision est prévue dans 1,5 s
   a.schedule('message de SAHYGO', 1500);
   a.schedule('minuterie (rien ne s\'est passé récemment)', 0);
   assert.strictEqual(a.raisonPrevue, 'message de SAHYGO');
@@ -531,7 +531,7 @@ test('repetition : meme idee avec d autres mots, ou question restee sans reponse
   a.memory.chat.push({ from: 'Joueur4', text: 'tas besoin fer ?', t: Date.now() - 600000 });
   assert.strictEqual(a.verifierRepetition('parler', { message: 'tas toujours besoin fer ?' }).length, 1);
   a.memory.chat.push({ from: 'Joueur4', text: 'vous faites quoi', t: Date.now() - 10000 });
-  a.memory.chat.push({ from: 'Joueur4', text: 'qq1 a du bois ?', t: Date.now() - 5000 });
+  a.memory.chat.push({ from: 'Joueur4', text: 'qq1 a du bois ?', t: Date.now() - 150000 });
   assert.match(a.verifierRepetition('parler', { message: 'tu veux du charbon ?' })[0], /personne n'a répondu/);
   a.memory.chat.push({ from: 'Joueur5', text: 'nan', t: Date.now() });
   assert.deepStrictEqual(a.verifierRepetition('parler', { message: 'tu veux du charbon ?' }), []);
@@ -602,29 +602,33 @@ test('perception : liste de ce qu il peut fabriquer tout de suite', () => {
   assert.match(texte, /Tu peux fabriquer maintenant : oak_planks\./);
 });
 
-test('bouche : accepter arrete l action en cours et relance les mains ; ne_rien_dire laisse jouer', async () => {
+test('cerveau : repondre en continuant son action, ou changer d action en arretant l ancienne', async () => {
   const { Agent } = require('../src/agent/agent');
   const { Vec3 } = require('vec3');
-  let reponse = { name: 'accepter', arguments: JSON.stringify({ quoi: 'donner du bois a SAHYGO', pensee: 'jai du bois et je suis pas loin' }) };
+  let reponse = { name: 'continuer', arguments: JSON.stringify({ dire: 'dans la grotte', pensee: 'je reponds sans arreter de miner' }) };
   const gateway = { cfg: { model: 'test', toolChoice: 'auto' }, mode: 'tools',
     chat: async () => ({ message: { role: 'assistant', tool_calls: [{ function: reponse }] }, finishReason: 'tool_calls' }) };
-  const logger = { write() {}, gameId: 'test' };
-  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: { agent: { humanize: false }, llm: { maxFormatRetries: 0 } }, gateway, logger });
+  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: { agent: { humanize: false }, llm: { maxFormatRetries: 0 } }, gateway, logger: { write() {}, gameId: 't' } });
   a.mcData = {};
-  a.bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: { SAHYGO: {} }, entities: {}, health: 20, food: 20,
-    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} }, pathfinder: { setGoal() {} } };
-  const relances = [];
-  a.schedule = (r) => relances.push(r);
+  const envoyes = [];
+  a.bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: { Joueur4: {}, SAHYGO: {} }, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [] }, findBlocks: () => [], findBlock: () => null, nearestEntity: () => null, time: { timeOfDay: 1000 },
+    registry: require('minecraft-data')('1.20.4'), pathfinder: { setGoal() {} }, chat: (m) => envoyes.push(m) };
+  const lancees = [];
+  a.lancerAction = (name) => lancees.push(name);
   a.actionEnCours = 'collecter';
-  await a.repondre('message de SAHYGO : "qqun me donne du bois ?"');
-  assert.strictEqual(a.memory.accepte.text, 'donner du bois a SAHYGO');
-  assert.strictEqual(a.bot.interrompre, true);
-  assert.deepStrictEqual(relances, ['tu as accepté : donner du bois a SAHYGO']);
-  a.bot.interrompre = false;
-  reponse = { name: 'ne_rien_dire', arguments: '{}' };
-  await a.repondre('message de SAHYGO : "lol"');
-  assert.strictEqual(a.bot.interrompre, false);
-  assert.strictEqual(relances.length, 1);
+  a.debutAction = Date.now();
+  a.actionFin = Promise.resolve();
+  await a.decide('message de SAHYGO : "t ou ?"');
+  assert.deepStrictEqual(envoyes, ['dans la grotte']); // il répond...
+  assert.deepStrictEqual(lancees, []); // ...et son action continue
+  assert.notStrictEqual(a.bot.interrompre, true);
+  reponse = { name: 'aller_vers_joueur', arguments: JSON.stringify({ joueur: 'SAHYGO', dire: 'ok jarrive' }) };
+  a.bot.players.SAHYGO = { entity: { position: new Vec3(5, 64, 0) } };
+  await a.decide('message de SAHYGO : "viens"');
+  assert.strictEqual(a.bot.interrompre, true); // l'ancienne action est arrêtée
+  assert.deepStrictEqual(lancees, ['aller_vers_joueur']); // et il fait ce qu'il dit
+  assert.deepStrictEqual(envoyes, ['dans la grotte', 'ok jarrive']);
 });
 
 test('reflexion : resume, avis, intention et defi adopte devient l etape suivante', async () => {

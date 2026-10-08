@@ -17,6 +17,8 @@ const { plansCabane, trouverTerrain, choisirBloc, vide } = require('./constructi
 const NOTE = { type: 'string', maxLength: 120 };
 const PROMESSE = { type: 'string', maxLength: 120 };
 const PENSEE = { type: 'string', maxLength: 150 };
+// Ce qu'il dit dans le chat en même temps que l'action (une seule décision pour la parole et l'action).
+const DIRE = { type: 'string', maxLength: 200 };
 const JOUEUR = { type: 'string', maxLength: 32 };
 const ID_MC = { type: 'string', maxLength: 64 };
 const COORD = { type: 'integer' };
@@ -25,13 +27,12 @@ function tool(name, description, properties, required = []) {
   return {
     name,
     description,
-    parameters: { type: 'object', properties: { ...properties, pensee: PENSEE, note: NOTE, promesse: PROMESSE }, required },
+    parameters: { type: 'object', properties: { ...properties, dire: DIRE, pensee: PENSEE, note: NOTE, promesse: PROMESSE }, required },
   };
 }
 
 const TOOLS = [
-  tool('parler', 'Écrire un message dans le chat public.', { message: { type: 'string', minLength: 1, maxLength: 200 } }, ['message']),
-  tool('murmurer', 'Envoyer un message privé à un joueur.', { joueur: JOUEUR, message: { type: 'string', minLength: 1, maxLength: 200 } }, ['joueur', 'message']),
+  tool('continuer', "Garder ce que tu fais (ou rester là si tu ne fais rien) : pratique pour juste répondre avec dire.", {}),
   tool('aller_vers_joueur', "Se déplacer jusqu'à un joueur visible.", { joueur: JOUEUR }, ['joueur']),
   tool('collecter', 'Miner ou couper des blocs proches et ramasser ce qui tombe.', { bloc: ID_MC, quantite: { type: 'integer', minimum: 1, maximum: 16 } }, ['bloc', 'quantite']),
   tool('fabriquer', 'Fabriquer un objet (utilise un établi proche si la recette le demande). quantite = nombre de fabrications.', { objet: ID_MC, quantite: { type: 'integer', minimum: 1, maximum: 16 } }, ['objet', 'quantite']),
@@ -56,10 +57,13 @@ const TOOLS = [
   tool('fuir', 'S\'éloigner du monstre le plus proche.', {}),
   tool('creuser', 'Creuser droit vers le bas (pour descendre vers les minerais : fer vers y=16, diamant vers y=-58).', { blocs: { type: 'integer', minimum: 1, maximum: 20 } }, ['blocs']),
   tool('remonter', 'Remonter à la surface.', {}),
+  tool('monter', 'Monter sur place en posant des blocs sous tes pieds (sauter + poser), pour sortir d\'un trou ou atteindre un endroit en hauteur.', { blocs: { type: 'integer', minimum: 1, maximum: 10 } }, ['blocs']),
   tool('construire', 'Construire une cabane de 5x5 près de toi (environ 70 blocs : cobblestone ou planches). Relance-la pour continuer le chantier.', {}),
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Blocs qu'un joueur pose sans regret pour monter ou faire un pont.
+const BLOCS_PILIER = ['dirt', 'cobblestone', 'cobbled_deepslate', 'netherrack', 'andesite', 'diorite', 'granite', 'tuff', 'gravel', 'sand'];
 
 // Les actions de jeu (miner, fabriquer, cuire, coffres...) viennent de Mindcraft (src/mindcraft, licence MIT) :
 // notre version maison ratait trop souvent. Mindcraft écrit ses messages dans bot.output et
@@ -88,7 +92,8 @@ function checkArgs(bot, name, args) {
   if (args.joueur === bot.username) errors.push("tu ne peux pas te viser toi-même");
   // bot.chat exécute tout texte commençant par "/" comme une commande serveur (ex. /designer) :
   // le modèle, ou un joueur qui le manipule par le chat, pourrait voter ou agir hors des outils.
-  if (typeof args.message === 'string' && args.message.trimStart().startsWith('/')) errors.push('un message ne peut pas commencer par "/"');
+  const texte = typeof args.dire === 'string' ? args.dire : args.message;
+  if (typeof texte === 'string' && texte.trimStart().startsWith('/')) errors.push('un message ne peut pas commencer par "/"');
   // Affamé sans nourriture, le builder a choisi "manger" 23 fois de suite : on refuse et il choisit autre chose.
   if (name === 'manger' && bot.inventory && !bot.inventory.items().some((i) => bot.registry.foodsByName[i.name])) {
     errors.push("tu n'as rien à manger : chasse un animal (chasser) ou explore pour en trouver");
@@ -98,11 +103,11 @@ function checkArgs(bot, name, args) {
     errors.push("personne d'autre n'est connecté, inutile de parler : fais autre chose");
   }
   // Sur un vrai serveur, 97 % des messages font 10 mots ou moins : au-delà de 12, on fait reformuler.
-  if (typeof args.message === 'string' && args.message.trim().split(/\s+/).length > 12) {
+  if (typeof texte === 'string' && texte.trim().split(/\s+/).length > 12) {
     errors.push('message trop long, un joueur écrit court (quelques mots)');
   }
   // Un joueur n'écrit pas "oak_log" dans le chat : on refuse et le modèle reformule.
-  if (typeof args.message === 'string' && /[a-z]+_[a-z]+/i.test(args.message)) {
+  if (typeof texte === 'string' && /[a-z]+_[a-z]+/i.test(texte)) {
     errors.push('écris comme un joueur, sans identifiant avec "_" (ex. oak_log -> bois)');
   }
   if ('x' in args && bot.entity && bot.entity.position.distanceTo(new Vec3(args.x, args.y, args.z)) > 64) {
@@ -118,6 +123,11 @@ function playerEntity(bot, name) {
 }
 
 const executors = {
+  // Le cerveau garde l'action en cours (agent.js) : rien à exécuter ici.
+  async continuer() {
+    return 'tu continues';
+  },
+
   async parler(bot, { message }) {
     bot.chat(message);
     return 'message envoyé';
@@ -318,6 +328,33 @@ const executors = {
     return `cabane en ${o.x} ${o.z} : ${poses} blocs posés, encore ${c.restants.length} (relance construire)`;
   },
 
+  // Le geste du joueur : regarder ses pieds, sauter et poser un bloc dessous au sommet du saut.
+  // Mindcraft ne sait pas le faire : pour poser un bloc là où il se tient, il s'écarte d'abord.
+  async monter(bot, { blocs }) {
+    const bloc = bot.inventory.items().find((i) => BLOCS_PILIER.includes(i.name));
+    if (!bloc) throw new Error('il te faut des blocs à poser (dirt, cobblestone...)');
+    await bot.equip(bloc, 'hand');
+    await bot.look(bot.entity.yaw, -Math.PI / 2, true); // regarder droit vers le bas
+    let poses = 0;
+    for (let i = 0; i < blocs && !bot.interrompre; i++) {
+      const dessus = bot.blockAt(bot.entity.position.offset(0, 2, 0));
+      if (dessus && dessus.boundingBox === 'block') break; // plafond : on ne peut plus monter
+      const depart = Math.floor(bot.entity.position.y);
+      const sol = bot.blockAt(bot.entity.position.offset(0, -1, 0));
+      bot.setControlState('jump', true);
+      for (let t = 0; t < 20 && bot.entity.position.y < depart + 1; t++) await sleep(50); // attendre le haut du saut
+      bot.setControlState('jump', false);
+      try {
+        await bot.placeBlock(sol, new Vec3(0, 1, 0));
+        poses++;
+      } catch { /* raté (trop tôt ou trop tard) : on réessaie au saut suivant */ }
+      await sleep(250);
+      if (!bot.inventory.items().some((it) => it.name === bloc.name)) break;
+    }
+    if (poses === 0) throw new Error("impossible de poser un bloc sous toi ici");
+    return `${poses} bloc(s) posé(s) sous toi, tu es à y=${Math.floor(bot.entity.position.y)}`;
+  },
+
   async remonter(bot) {
     // goToSurface de Mindcraft vise directement la surface (100 blocs plus haut) : trop loin pour la
     // recherche de chemin (limitée à 96 blocs). On monte donc par paliers de 30 blocs.
@@ -410,7 +447,7 @@ async function execute(bot, name, args, ctx, timeoutMs) {
 
 // On n'envoie au modèle que les outils qui servent dans la situation (moins de tokens par appel) :
 // pas de chat sans autre joueur, pas de coffre sans coffre proche, pas de combat sans monstre...
-const OUTILS_JOUEURS = ['parler', 'murmurer', 'aller_vers_joueur', 'suivre_joueur', 'regarder_joueur', 'donner'];
+const OUTILS_JOUEURS = ['aller_vers_joueur', 'suivre_joueur', 'regarder_joueur', 'donner'];
 const OUTILS_COFFRE = ['voir_coffre', 'prendre_coffre', 'deposer_coffre'];
 const OUTILS_COMBAT = ['se_defendre', 'fuir'];
 
@@ -438,13 +475,6 @@ function outilsUtiles(bot) {
   ));
 }
 
-// Outils de la bouche (agent.js, repondre) : elle répond au chat pendant que les mains jouent.
-const OUTILS_BOUCHE = [
-  ...TOOLS.filter((t) => t.name === 'parler' || t.name === 'murmurer'),
-  tool('ne_rien_dire', 'Ne pas répondre : tu continues ce que tu fais.', {}),
-  tool('accepter', "Faire tout de suite ce qu'on te demande : tu arrêtes ton action et tu t'en occupes. quoi = ce que tu vas faire ; message (optionnel) = ta réponse dans le chat.",
-    { quoi: { type: 'string', minLength: 1, maxLength: 120 }, message: { type: 'string', maxLength: 200 } }, ['quoi']),
-];
 
 // Outil de la réflexion (agent.js, reflechir) : toutes les quelques minutes, il fait le point.
 const TEXTE = (n) => ({ type: 'string', maxLength: n });
@@ -464,4 +494,4 @@ const OUTIL_REFLEXION = {
   },
 };
 
-module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles, OUTILS_BOUCHE, OUTIL_REFLEXION };
+module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles, OUTIL_REFLEXION };

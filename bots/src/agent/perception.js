@@ -127,6 +127,11 @@ function observe(bot, mcData, memory) {
   if (bot.inventory.emptySlotCount && bot.inventory.emptySlotCount() <= 2) {
     idees.push("ton inventaire est presque plein, tu ne ramasses plus rien : jette ce qui ne sert pas (jeter cobblestone, dirt...)");
   }
+  // Ça bloque : la même action a raté 3 fois en 5 minutes -> il peut demander aux autres.
+  const rates = {};
+  for (const a of memory.historique || []) if (!a.ok && Date.now() - a.t < 5 * 60000) rates[a.name] = (rates[a.name] || 0) + 1;
+  const bloque = Object.entries(rates).find(([, n]) => n >= 3);
+  if (bloque) idees.push(`${bloque[0]} rate souvent : si c'est trop galère, demande de l'aide ou l'objet aux autres (dire)`);
   if (nb('_log') >= 32) idees.push('tu as déjà beaucoup de bois, fais autre chose avec');
   if (bot.food <= 14 && !aManger) {
     idees.push(animaux.length > 0
@@ -154,10 +159,6 @@ function observe(bot, mcData, memory) {
   if (demandes.length > 0) {
     lines.push('', "Ce qu'on t'a demandé récemment (à toi de voir selon ton caractère et ce que tu fais : maintenant, plus tard ou non) :");
     for (const d of demandes) lines.push(`- [${agoText(d.t)}] <${d.from}> ${d.text}${d.info || ''}`);
-  }
-  // Ce que la bouche a accepté de faire tout de suite : les mains doivent s'en occuper.
-  if (memory.accepte && Date.now() - memory.accepte.t < 5 * 60000) {
-    lines.push('', `Tu as accepté de faire maintenant (${agoText(memory.accepte.t)}) : ${memory.accepte.text}`);
   }
   const promesses = (memory.promesses || []).filter((p) => Date.now() - p.t < 20 * 60000);
   if (promesses.length > 0) {
