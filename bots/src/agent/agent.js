@@ -406,7 +406,8 @@ class Agent {
           { role: 'system', content: systemPrompt(this.username, this.persona, this.caractere, this.humeur) },
           { role: 'user', content: turnPrompt(observation, reason, enCours) },
         ],
-        tools: outilsUtiles(bot),
+        // "continuer" seulement pendant une action : sans action, il le prenait pour "continuer mon plan" et ne faisait rien.
+        tools: outilsUtiles(bot).filter((t) => t.name !== 'continuer' || this.actionEnCours),
         meta: { agent: this.username, decisionId, kind: 'decision' },
         extraCheck: (name, args) => [...checkArgs(bot, name, args), ...this.verifierRepetition(name, args), ...this.verifierEchecs(name, args), ...this.verifierCombat(name, args)],
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
