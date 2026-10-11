@@ -335,7 +335,8 @@ test('explorer : garde à peu près la même direction et va à 30-60 blocs, cha
   await executors.explorer(bot);
   const cap = (g) => Math.atan2(g.z, g.x);
   const ecart = Math.abs(Math.atan2(Math.sin(cap(buts[0]) - cap(buts[1])), Math.cos(cap(buts[0]) - cap(buts[1]))));
-  assert.ok(ecart <= 0.8, `écart de direction ${ecart}`);
+  // 0,8 au plus (2 x 0,4 de hasard), plus une marge : le but arrondit les coordonnées à l'entier.
+  assert.ok(ecart <= 0.85, `écart de direction ${ecart}`);
   const dist = Math.hypot(buts[0].x, buts[0].z);
   assert.ok(dist >= 30 && dist <= 60, `distance ${dist}`);
   bloque = true;
