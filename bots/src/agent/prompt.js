@@ -55,7 +55,7 @@ Fais le point, comme un joueur qui réfléchit 2 secondes à sa partie (appelle 
 - resume : ce qui s'est passé ces dernières minutes, ce qui marche ou pas, en quelques phrases courtes.
 - avis : pour chaque autre joueur que tu connais, ce que tu penses de lui (sympa, relou, il t'a aidé, il répond jamais...).
 - intention : ce que tu vas faire les prochaines minutes, dans l'ordre (ton objectif, une promesse, un défi...).
-- nouvel_objectif (optionnel) : si tu décides de viser un objet précis qui n'est pas dans tes objectifs (un défi accepté, un truc dont tu as envie), son identifiant anglais (ex. diamond_block), et nombre si besoin. Le jeu te donnera les étapes.`;
+- nouvel_objectif (optionnel, RARE) : seulement si tu changes vraiment de projet pour un bon moment (un défi accepté, une demande importante d'un joueur, une grosse envie) : l'identifiant anglais de l'objet (ex. diamond_block), et nombre si besoin. Sinon laisse vide : tu as déjà tes objectifs et la prochaine étape est calculée pour toi. Le jeu te donnera les étapes.`;
 }
 
 // LA PAROLE : une consigne courte centrée sur la conversation (le cerveau des actions, lui, ne parle pas).

@@ -478,7 +478,14 @@ class Agent {
       for (const { joueur, avis } of r.avis || []) {
         if (joueur && avis && joueur !== this.username) this.memory.avis[joueur] = avis;
       }
-      if (r.nouvel_objectif) this.memory.objectifPerso = { objet: r.nouvel_objectif, nombre: r.nombre || 1 };
+      // Un nouvel objectif seulement s'il n'en a pas déjà un en cours, et si le plan sait comment l'obtenir.
+      // Avant, 51 réflexions sur 56 changeaient d'objectif (cuivre, plumes...) : il changeait de projet toutes les 3 min.
+      if (r.nouvel_objectif) {
+        const etape = this.recettes ? prochaineEtape(r.nouvel_objectif, bot.inventory.items(), this.recettes, r.nombre || 1) : null;
+        const faisable = etape && !etape.startsWith('trouver');
+        if (!this.memory.objectifPerso && faisable) this.memory.objectifPerso = { objet: r.nouvel_objectif, nombre: r.nombre || 1 };
+        else this.logger.write('events', { agent: this.username, type: 'objectif_refuse', text: `${r.nouvel_objectif} (${this.memory.objectifPerso ? 'un objectif est déjà en cours' : 'pas faisable ou déjà atteint'})` });
+      }
       this.logger.write('decisions', {
         agent: this.username, decision_id: decisionId, kind: 'reflexion', ok: true, tool: 'reflexion', args: r,
         llm_call_ids: choice.callIds, llm_ms: Date.now() - t0,

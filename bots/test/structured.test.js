@@ -693,3 +693,23 @@ test('combat contre un joueur : seulement s il m a frappe ou si un duel est prop
   assert.deepStrictEqual(a.verifierCombat('combattre', { joueur: 'Joueur4' }), []);
   assert.strictEqual(a.verifierCombat('combattre', { joueur: 'Joueur6' }).length, 0);
 });
+
+test('reflexion : un seul objectif personnel a la fois, et seulement s il est faisable', async () => {
+  const { Agent } = require('../src/agent/agent');
+  const { Vec3 } = require('vec3');
+  const mc = await import('../src/mindcraft/mcdata.mjs');
+  mc.init('1.20.4');
+  let objectif = 'diamond_block';
+  const gateway = { cfg: { model: 'test', toolChoice: 'auto' }, mode: 'tools',
+    chat: async () => ({ message: { role: 'assistant', tool_calls: [{ function: { name: 'reflexion', arguments: JSON.stringify({ resume: 'r', intention: 'i', nouvel_objectif: objectif }) } }] }, finishReason: 'tool_calls' }) };
+  const a = new Agent(require('../agents.json')[1], { cfg: { agent: { humanize: false, mission: '' }, llm: { maxFormatRetries: 0 } }, gateway, logger: { write() {}, gameId: 't' } });
+  a.mcData = {};
+  a.recettes = mc.getItemCraftingRecipes;
+  a.bot = { username: 'Joueur5', entity: { position: new Vec3(0, 64, 0) }, players: {}, entities: {}, health: 20, food: 20,
+    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: require('minecraft-data')('1.20.4') };
+  await a.reflechir();
+  assert.strictEqual(a.memory.objectifPerso.objet, 'diamond_block');
+  objectif = 'feather';
+  await a.reflechir();
+  assert.strictEqual(a.memory.objectifPerso.objet, 'diamond_block'); // pas de changement de projet toutes les 3 min
+});
