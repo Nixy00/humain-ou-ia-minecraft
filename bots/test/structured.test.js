@@ -602,33 +602,37 @@ test('perception : liste de ce qu il peut fabriquer tout de suite', () => {
   assert.match(texte, /Tu peux fabriquer maintenant : oak_planks\./);
 });
 
-test('cerveau : repondre en continuant son action, ou changer d action en arretant l ancienne', async () => {
+test('parole : repond sans toucher a l action ; un engagement reveille le cerveau des actions', async () => {
   const { Agent } = require('../src/agent/agent');
   const { Vec3 } = require('vec3');
-  let reponse = { name: 'continuer', arguments: JSON.stringify({ dire: 'dans la grotte', pensee: 'je reponds sans arreter de miner' }) };
+  let reponse = { dire: 'ouais jen ai une quarantaine', engagement: 'rien', pensee: 'il me demande juste' };
   const gateway = { cfg: { model: 'test', toolChoice: 'auto' }, mode: 'tools',
-    chat: async () => ({ message: { role: 'assistant', tool_calls: [{ function: reponse }] }, finishReason: 'tool_calls' }) };
-  const a = new Agent({ username: 'Joueur4', persona: '' }, { cfg: { agent: { humanize: false }, llm: { maxFormatRetries: 0 } }, gateway, logger: { write() {}, gameId: 't' } });
+    chat: async () => ({ message: { role: 'assistant', tool_calls: [{ function: { name: 'repondre', arguments: JSON.stringify(reponse) } }] }, finishReason: 'tool_calls' }) };
+  const a = new Agent({ username: 'Joueur4', persona: '', vie: '19 ans, Lille' }, { cfg: { agent: { humanize: false }, llm: { maxFormatRetries: 0 } }, gateway, logger: { write() {}, gameId: 't' } });
   a.mcData = {};
   const envoyes = [];
-  a.bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: { Joueur4: {}, SAHYGO: {} }, entities: {}, health: 20, food: 20,
-    inventory: { items: () => [] }, findBlocks: () => [], findBlock: () => null, nearestEntity: () => null, time: { timeOfDay: 1000 },
-    registry: require('minecraft-data')('1.20.4'), pathfinder: { setGoal() {} }, chat: (m) => envoyes.push(m) };
-  const lancees = [];
-  a.lancerAction = (name) => lancees.push(name);
+  a.bot = { username: 'Joueur4', entity: { position: new Vec3(0, 64, 0) }, players: { Joueur4: {}, Joueur6: {} }, health: 20, food: 20,
+    inventory: { items: () => [{ name: 'cobblestone', count: 40 }] }, time: { timeOfDay: 1000 }, registry: require('minecraft-data')('1.20.4'), chat: (m) => envoyes.push(m) };
+  const relances = [];
+  a.schedule = (r) => relances.push(r);
   a.actionEnCours = 'collecter';
-  a.debutAction = Date.now();
-  a.actionFin = Promise.resolve();
-  await a.decide('message de SAHYGO : "t ou ?"');
-  assert.deepStrictEqual(envoyes, ['dans la grotte']); // il répond...
-  assert.deepStrictEqual(lancees, []); // ...et son action continue
-  assert.notStrictEqual(a.bot.interrompre, true);
-  reponse = { name: 'aller_vers_joueur', arguments: JSON.stringify({ joueur: 'SAHYGO', dire: 'ok jarrive' }) };
-  a.bot.players.SAHYGO = { entity: { position: new Vec3(5, 64, 0) } };
-  await a.decide('message de SAHYGO : "viens"');
-  assert.strictEqual(a.bot.interrompre, true); // l'ancienne action est arrêtée
-  assert.deepStrictEqual(lancees, ['aller_vers_joueur']); // et il fait ce qu'il dit
-  assert.deepStrictEqual(envoyes, ['dans la grotte', 'ok jarrive']);
+  a.memory.chat.push({ from: 'Joueur6', text: 'joueur4 tas de la pierre ?', t: Date.now() });
+  assert.match(a.filConversation(), /Joueur6 \(à toi\) : joueur4 tas de la pierre/);
+  await a.parler('Joueur6 vient d\'écrire : "joueur4 tas de la pierre ?"');
+  assert.deepStrictEqual(envoyes, ['ouais jen ai une quarantaine']);
+  assert.deepStrictEqual(relances, []); // pas d'engagement : son action continue
+  reponse = { dire: 'ok jte file 10', engagement: 'donner 10 cobblestone à Joueur6' };
+  await a.parler('Joueur6 vient d\'écrire : "tu men passes ?"');
+  assert.strictEqual(a.memory.engagement.text, 'donner 10 cobblestone à Joueur6');
+  assert.deepStrictEqual(relances, ["tu t'es engagé dans le chat : donner 10 cobblestone à Joueur6"]);
+});
+
+test('filtre des messages : argot repete enleve, messages vides ou deja dits pas envoyes', () => {
+  const { filtrerMessage } = require('../src/agent/humanizer');
+  assert.strictEqual(filtrerMessage('mdr il pleut', ['jai du fer mdr']), 'il pleut');
+  assert.strictEqual(filtrerMessage('mdr il pleut', ['ok']), 'mdr il pleut');
+  assert.strictEqual(filtrerMessage('encore', []), null);
+  assert.strictEqual(filtrerMessage('jfais le toit', ['jfais le toit']), null);
 });
 
 test('reflexion : resume, avis, intention et defi adopte devient l etape suivante', async () => {

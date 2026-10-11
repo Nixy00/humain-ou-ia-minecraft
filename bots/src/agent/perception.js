@@ -160,6 +160,10 @@ function observe(bot, mcData, memory) {
     lines.push('', "Ce qu'on t'a demandé récemment (à toi de voir selon ton caractère et ce que tu fais : maintenant, plus tard ou non) :");
     for (const d of demandes) lines.push(`- [${agoText(d.t)}] <${d.from}> ${d.text}${d.info || ''}`);
   }
+  // Ce que sa parole a promis de faire tout de suite dans le chat : le cerveau des actions doit le faire.
+  if (memory.engagement && Date.now() - memory.engagement.t < 5 * 60000) {
+    lines.push('', `Tu t'es engagé dans le chat (${agoText(memory.engagement.t)}) : ${memory.engagement.text}. Fais-le maintenant.`);
+  }
   const promesses = (memory.promesses || []).filter((p) => Date.now() - p.t < 20 * 60000);
   if (promesses.length > 0) {
     lines.push('', "Tes promesses (quand ton truc est fini, tiens-les ou demande s'il a toujours besoin) :");

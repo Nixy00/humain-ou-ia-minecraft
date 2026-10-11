@@ -16,9 +16,7 @@ const { plansCabane, trouverTerrain, choisirBloc, vide } = require('./constructi
 // répétées dans les 23 outils, elles faisaient 40 % de la taille de chaque requête.
 const NOTE = { type: 'string', maxLength: 120 };
 const PROMESSE = { type: 'string', maxLength: 120 };
-const PENSEE = { type: 'string', maxLength: 150 };
-// Ce qu'il dit dans le chat en même temps que l'action (une seule décision pour la parole et l'action).
-const DIRE = { type: 'string', maxLength: 200 };
+const PENSEE = { type: 'string', maxLength: 300 };
 const JOUEUR = { type: 'string', maxLength: 32 };
 const ID_MC = { type: 'string', maxLength: 64 };
 const COORD = { type: 'integer' };
@@ -27,12 +25,11 @@ function tool(name, description, properties, required = []) {
   return {
     name,
     description,
-    parameters: { type: 'object', properties: { ...properties, dire: DIRE, pensee: PENSEE, note: NOTE, promesse: PROMESSE }, required },
+    parameters: { type: 'object', properties: { ...properties, pensee: PENSEE, note: NOTE, promesse: PROMESSE }, required },
   };
 }
 
 const TOOLS = [
-  tool('continuer', "Garder ce que tu fais (ou rester là si tu ne fais rien) : pratique pour juste répondre avec dire.", {}),
   tool('aller_vers_joueur', "Se déplacer jusqu'à un joueur visible.", { joueur: JOUEUR }, ['joueur']),
   tool('collecter', 'Miner ou couper des blocs proches et ramasser ce qui tombe.', { bloc: ID_MC, quantite: { type: 'integer', minimum: 1, maximum: 16 } }, ['bloc', 'quantite']),
   tool('fabriquer', 'Fabriquer un objet (utilise un établi proche si la recette le demande). quantite = nombre de fabrications.', { objet: ID_MC, quantite: { type: 'integer', minimum: 1, maximum: 16 } }, ['objet', 'quantite']),
@@ -124,11 +121,6 @@ function playerEntity(bot, name) {
 }
 
 const executors = {
-  // Le cerveau garde l'action en cours (agent.js) : rien à exécuter ici.
-  async continuer() {
-    return 'tu continues';
-  },
-
   async parler(bot, { message }) {
     bot.chat(message);
     return 'message envoyé';
@@ -504,15 +496,33 @@ function outilsUtiles(bot) {
 
 // Outil de la réflexion (agent.js, reflechir) : toutes les quelques minutes, il fait le point.
 const TEXTE = (n) => ({ type: 'string', maxLength: n });
+// Outil de la parole (agent.js, parler) : les deux champs sont obligatoires, sinon le modèle "oubliait" de répondre.
+// engagement = ce qu'il promet de faire tout de suite : le cerveau des actions le fera (cohérence parole/actions).
+const OUTIL_PAROLE = {
+  name: 'repondre',
+  description: 'Ta réaction dans le chat.',
+  parameters: {
+    type: 'object',
+    properties: {
+      dire: { type: 'string', maxLength: 200 },
+      engagement: { type: 'string', maxLength: 150 },
+      pensee: { type: 'string', maxLength: 300 },
+      note: { type: 'string', maxLength: 150 },
+      promesse: { type: 'string', maxLength: 150 },
+    },
+    required: ['dire', 'engagement'],
+  },
+};
+
 const OUTIL_REFLEXION = {
   name: 'reflexion',
   description: 'Faire le point sur la partie.',
   parameters: {
     type: 'object',
     properties: {
-      resume: TEXTE(400),
+      resume: TEXTE(800),
       avis: { type: 'array', items: { type: 'object', properties: { joueur: TEXTE(32), avis: TEXTE(120) } } },
-      intention: TEXTE(200),
+      intention: TEXTE(400),
       nouvel_objectif: TEXTE(64),
       nombre: { type: 'integer', minimum: 1, maximum: 64 },
     },
@@ -520,4 +530,4 @@ const OUTIL_REFLEXION = {
   },
 };
 
-module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles, OUTIL_REFLEXION };
+module.exports = { TOOLS, executors, execute, checkArgs, nomObjet, outilsUtiles, OUTIL_REFLEXION, OUTIL_PAROLE };
