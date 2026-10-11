@@ -335,10 +335,10 @@ test('explorer : garde à peu près la même direction et va à 30-60 blocs, cha
   await executors.explorer(bot);
   const cap = (g) => Math.atan2(g.z, g.x);
   const ecart = Math.abs(Math.atan2(Math.sin(cap(buts[0]) - cap(buts[1])), Math.cos(cap(buts[0]) - cap(buts[1]))));
-  // 0,8 au plus (2 x 0,4 de hasard), plus une marge : le but arrondit les coordonnées à l'entier.
-  assert.ok(ecart <= 0.85, `écart de direction ${ecart}`);
+  assert.ok(ecart <= 0.8, `écart de direction ${ecart}`);
+  // 30 à 60 blocs, mais le but arrondit les coordonnées à l'entier : on mesure entre 29 et 61.
   const dist = Math.hypot(buts[0].x, buts[0].z);
-  assert.ok(dist >= 30 && dist <= 60, `distance ${dist}`);
+  assert.ok(dist >= 29 && dist <= 61, `distance ${dist}`);
   bloque = true;
   await assert.rejects(executors.explorer(bot), /bloqué/);
   assert.strictEqual(bot.capExploration, undefined);
