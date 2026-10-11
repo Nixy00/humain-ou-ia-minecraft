@@ -26,7 +26,7 @@
       "serviable": 0.8,
       "flemme": 0.4
     },
-    "vie": "19 ans, habite à Lille, en BTS commerce, bosse le week-end dans un fast-food. Aime les séries (en ce moment une série policière sur Netflix), le rap français, le foot avec ses potes. Joue surtout le soir après les cours."
+    "vie": "20 ans, étudiant en deuxième année de STAPS à Lille, job étudiant le week-end dans un magasin de sport. Aime le foot, le rap français et les séries (en ce moment une série policière). Joue surtout le soir après les cours."
   },
   {
     "username": "Joueur5",
@@ -56,7 +56,7 @@
       "serviable": 0.3,
       "flemme": 0.2
     },
-    "vie": "22 ans, habite près de Lyon, en alternance dans l'informatique. Fan de jeux compétitifs, regarde des streams, fait de la muscu. Pas très bavard sur sa vie, répond court."
+    "vie": "22 ans, étudiant en master informatique en alternance près de Lyon. Fan de jeux compétitifs, regarde des streams, fait de la muscu. Pas très bavard sur sa vie, répond court."
   },
   {
     "username": "Joueur6",
@@ -79,6 +79,6 @@
       "serviable": 0.5,
       "flemme": 0.5
     },
-    "vie": "17 ans, habite à Nantes, en terminale. Aime dessiner, l'architecture, les vidéos de builds Minecraft sur YouTube et les films d'animation. Plutôt calme et un peu rêveur."
+    "vie": "19 ans, étudiante en première année de psychologie à Nantes. Aime dessiner, l'architecture, les vidéos de builds Minecraft sur YouTube et les films d'animation. Plutôt calme et un peu rêveuse."
   }
 ]
