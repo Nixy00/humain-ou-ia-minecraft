@@ -713,3 +713,33 @@ test('reflexion : un seul objectif personnel a la fois, et seulement s il est fa
   await a.reflechir();
   assert.strictEqual(a.memory.objectifPerso.objet, 'diamond_block'); // pas de changement de projet toutes les 3 min
 });
+
+test('chat : a qui s adresse un message, messages sans contenu, coordonnees annoncees', () => {
+  const { citeUnAutre, sansContenu, positionAnnoncee } = require('../src/agent/demandes');
+  const joueurs = ['Joueur4', 'Joueur5', 'Joueur6', 'DrAlphaCheat'];
+  assert.strictEqual(citeUnAutre('je suis avec toi joueur 4', 'Joueur6', joueurs), true); // pas pour Joueur6
+  assert.strictEqual(citeUnAutre('je suis avec toi joueur 4', 'Joueur4', joueurs), false);
+  assert.strictEqual(sansContenu('merci'), true);
+  assert.strictEqual(sansContenu('bonne chance alors'), true);
+  assert.strictEqual(sansContenu('merci tu peux men donner encore ?'), false);
+  assert.deepStrictEqual(positionAnnoncee('je suis en 0 0 maintenant'), { x: 0, z: 0 });
+  assert.deepStrictEqual(positionAnnoncee('28 64 31'), { x: 28, y: 64, z: 31 });
+  assert.strictEqual(positionAnnoncee('jai 15 bois'), null);
+});
+
+test('creuser : jamais plus bas que le niveau des diamants (bedrock)', async () => {
+  const { executors } = require('../src/agent/actions');
+  const { Vec3 } = require('vec3');
+  await assert.rejects(executors.creuser({ entity: { position: new Vec3(0, -59, 0) } }, { blocs: 10 }), /tout en bas/);
+});
+
+test('donner a un joueur trop loin : va a ses coordonnees annoncees, sinon les demande', async () => {
+  const { executors } = require('../src/agent/actions');
+  await assert.rejects(executors.donner({ players: { DrAlphaCheat: {} } }, { joueur: 'DrAlphaCheat', objet: 'oak_log', quantite: 5 }), /demande-les-lui/);
+});
+
+test('filtre : un message avec une insulte grave n est jamais envoye', () => {
+  const { filtrerMessage } = require('../src/agent/humanizer');
+  assert.strictEqual(filtrerMessage("jsais pas c'est qui le sale noir", []), null);
+  assert.strictEqual(filtrerMessage('calme toi', []), 'calme toi');
+});

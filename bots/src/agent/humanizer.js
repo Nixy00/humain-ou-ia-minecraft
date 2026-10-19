@@ -93,8 +93,13 @@ function delaiEntreCoups() {
 const ARGOT = ['mdr', 'ptdr', 'wsh', 'tkt', 'frr', 'wtf', 'lol'];
 const aDeLArgot = (t) => t.toLowerCase().split(/[^a-zà-ÿ]+/).some((mot) => ARGOT.includes(mot));
 
+// Insultes graves (racistes, homophobes...) : un message qui en contient n'est jamais envoyé, même si le modèle
+// la reprend en répondant (testé : "c'est qui le sale noir" en réponse à une insulte). Garde-fou du code, pas de la consigne.
+const INSULTES_GRAVES = /\b(n[eè]gr\w*|negro\w*|sale noir|sale arabe|bougnoul\w*|youpin\w*|p[ée]d[ée]s?|tapettes?|bicot\w*)\b/i;
+
 function filtrerMessage(texte, mesDerniers) {
   let t = String(texte || '').trim();
+  if (INSULTES_GRAVES.test(t)) return null;
   if (mesDerniers.slice(-4).some(aDeLArgot)) {
     t = t.split(' ').filter((mot) => !ARGOT.includes(mot.toLowerCase().replace(/[^a-z]/g, ''))).join(' ').trim();
   }

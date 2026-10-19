@@ -60,6 +60,16 @@ const TOOLS = [
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Niveau des diamants : on ne creuse pas plus bas (bedrock juste en dessous).
+const FOND = -58;
+
+// Un joueur trop loin pour être vu : aller aux coordonnées qu'il a données dans le chat (10 dernières minutes).
+async function allerVersCoordonnees(bot, joueur) {
+  const p = bot.positionsAnnoncees && bot.positionsAnnoncees[joueur];
+  if (!p || Date.now() - p.t > 10 * 60000) throw new Error(`${joueur} est trop loin pour que tu le voies et tu n'as pas ses coordonnées : demande-les-lui`);
+  await mindcraft(bot, 'goToGoal', new goals.GoalNearXZ(p.x, p.z, 3));
+  if (!bot.players[joueur] || !bot.players[joueur].entity) throw new Error(`tu es allé en ${p.x} ${p.z} mais ${joueur} n'est plus là : demande-lui où il est`);
+}
 // Blocs qu'un joueur pose sans regret pour monter ou faire un pont.
 const BLOCS_PILIER = ['dirt', 'cobblestone', 'cobbled_deepslate', 'netherrack', 'andesite', 'diorite', 'granite', 'tuff', 'gravel', 'sand'];
 
@@ -132,8 +142,8 @@ const executors = {
   },
 
   async aller_vers_joueur(bot, { joueur }) {
-    // Il réessayait 6 fois de suite "Could not find SAHYGO" alors que le joueur était juste trop loin.
-    if (!bot.players[joueur].entity) throw new Error(`${joueur} est trop loin pour que tu le voies : demande-lui ses coordonnées puis utilise aller_a`);
+    // Trop loin pour être vu : il va aux coordonnées que le joueur a données dans le chat, s'il y en a.
+    if (!bot.players[joueur].entity) await allerVersCoordonnees(bot, joueur);
     return mindcraft(bot, 'goToPlayer', joueur, 2);
   },
 
@@ -154,6 +164,8 @@ const executors = {
   },
 
   async donner(bot, { joueur, objet, quantite }) {
+    // Il promettait 15 bois 15 fois sans jamais les donner : "Could not find" quand le joueur était trop loin.
+    if (!bot.players[joueur].entity) await allerVersCoordonnees(bot, joueur);
     return mindcraft(bot, 'giveToPlayer', nomObjet(bot, objet), joueur, quantite);
   },
 
@@ -303,7 +315,10 @@ const executors = {
   },
 
   async creuser(bot, { blocs }) {
-    return mindcraft(bot, 'digDown', blocs);
+    // On s'arrête au niveau des diamants (y=-58) : en dessous c'est la bedrock, il creusait dedans 70 fois.
+    const possible = Math.floor(bot.entity.position.y) - FOND;
+    if (possible <= 0) throw new Error(`tu es déjà tout en bas (y=${Math.floor(bot.entity.position.y)}) : mine autour de toi (collecter) au lieu de creuser`);
+    return mindcraft(bot, 'digDown', Math.min(blocs, possible));
   },
 
   async construire(bot) {
@@ -385,7 +400,12 @@ const executors = {
     }
     while (bot.entity.position.y < surface - 1 && !bot.interrompre) {
       const avant = bot.entity.position.y;
-      await mindcraft(bot, 'goToGoal', new goals.GoalY(Math.min(surface, Math.floor(avant) + 30)));
+      try {
+        await mindcraft(bot, 'goToGoal', new goals.GoalY(Math.min(surface, Math.floor(avant) + 30)));
+      } catch {
+        // Pas de chemin (au fond d'un puits de 1 x 1, 48 échecs) : il monte en pilier, bloc par bloc.
+        await executors.monter(bot, { blocs: 10 });
+      }
       if (bot.entity.position.y <= avant) throw new Error('impossible de monter plus haut ici');
     }
     return `tu es remonté (y=${Math.round(bot.entity.position.y)})`;

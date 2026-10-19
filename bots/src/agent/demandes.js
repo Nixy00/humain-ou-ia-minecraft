@@ -49,4 +49,24 @@ function dejaRepondu(chat, demandeur, depuis, moi) {
   return chat.some((m) => m.t > depuis && m.from !== demandeur && m.from !== moi);
 }
 
-module.exports = { objetDemande, coutDemande, delaiReaction, dejaRepondu };
+// Un message qui cite un autre joueur s'adresse à lui : avant, les 3 bots répondaient à tout,
+// ("je suis avec toi joueur 4" -> c'est Joueur6 qui répondait "ah ouais pas mal").
+function citeUnAutre(texte, moi, joueurs) {
+  const t = texte.toLowerCase().replace(/joueur\s+(\d)/g, 'joueur$1'); // "joueur 4" = "Joueur4"
+  return joueurs.some((j) => j !== moi && t.includes(j.toLowerCase()));
+}
+
+// Messages sans contenu auxquels personne ne répond ("merci", "ok", "tkt"...) : sinon les bots
+// se répondaient entre eux sans fin ("merci" -> "de rien" -> "tkt" -> "bonne chance").
+function sansContenu(texte) {
+  return /^(merci|ok|oki|okay|tkt|de rien|mdr|ptdr|gg|bonne chance|bon courage|ouais|oui|nan|non|cool|top|parfait|ah|oh)\b[\s!.?]*\S{0,10}$/i.test(texte.trim());
+}
+
+// Coordonnées données dans le chat ("je suis en 0 0", "-10 64 10") : "x z" ou "x y z".
+function positionAnnoncee(texte) {
+  const m = texte.match(/(-?\d{1,5})[\s,;/]+(-?\d{1,5})(?:[\s,;/]+(-?\d{1,5}))?/);
+  if (!m) return null;
+  return m[3] !== undefined ? { x: +m[1], y: +m[2], z: +m[3] } : { x: +m[1], z: +m[2] };
+}
+
+module.exports = { objetDemande, coutDemande, delaiReaction, dejaRepondu, citeUnAutre, sansContenu, positionAnnoncee };

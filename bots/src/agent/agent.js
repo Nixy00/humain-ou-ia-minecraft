@@ -12,7 +12,7 @@ const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverA
 const { startReflexes } = require('./reflexes');
 const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
 const { NB_BLOCS } = require('./construction');
-const { objetDemande, coutDemande, delaiReaction, dejaRepondu } = require('./demandes');
+const { objetDemande, coutDemande, delaiReaction, dejaRepondu, citeUnAutre, sansContenu, positionAnnoncee } = require('./demandes');
 const { callTool } = require('../llm/structured');
 
 const HUMEURS = ['motivé', 'normal', 'normal', 'un peu fatigué', 'de bonne humeur'];
@@ -41,6 +41,7 @@ class Agent {
     this.pendingReason = null;
     this.frappePar = {}; // joueur -> dernière fois qu'il m'a frappé
     this.dejaVu = {}; // joueur -> dernière fois que je l'ai remarqué près de moi
+    this.positions = {}; // joueur -> coordonnées qu'il a données dans le chat
     this.stopping = false;
     this.reconnectDelay = 5000;
   }
@@ -99,14 +100,12 @@ class Agent {
       this.vuTimer = setInterval(() => this.remarquerJoueurs(), 2000);
     });
 
-    // Qui l'a frappé : le joueur le plus proche qui vient de donner un coup (Mineflayer ne donne pas l'attaquant).
-    this.gestes = {};
-    bot.on('entitySwingArm', (e) => { if (e.type === 'player') this.gestes[e.username] = Date.now(); });
-    bot.on('entityHurt', (e) => {
-      if (e !== bot.entity) return;
-      const frappeur = Object.values(bot.players).find((p) => p.username !== this.username && p.entity
-        && p.entity.position.distanceTo(bot.entity.position) < 5 && Date.now() - (this.gestes[p.username] || 0) < 800);
-      if (!frappeur) return;
+    // Qui l'a frappé : l'attaquant envoyé par le serveur (paquet damage_event, Mineflayer 4.39).
+    // Avant, on prenait le joueur proche qui bougeait le bras : un bot qui mine bouge aussi le bras, faux coupable
+    // et bagarres sans raison ("t'as tapé pour rien").
+    bot.on('entityHurt', (e, source) => {
+      if (e !== bot.entity || !source || source.type !== 'player' || !source.username) return;
+      const frappeur = { username: source.username };
       this.frappePar[frappeur.username] = Date.now();
       this.onEvent({ type: 'frappe', text: `${frappeur.username} t'a frappé (vie ${Math.round(bot.health)}/20)` }, null);
       this.entendre(`${frappeur.username} vient de te frapper (vie ${Math.round(bot.health)}/20) : réagis, et engage-toi à te battre ou fuir si tu veux`);
@@ -119,13 +118,24 @@ class Agent {
       const seulsTousLesDeux = Object.keys(bot.players).length <= 2;
       // Un message à tout le monde ("vous", "qq1", "allo y'a quelqu'un") le concerne aussi :
       // pendant un test, "bande de fou allez me chercher..." et "vous pouvez parler ???" n'ont eu aucune réponse.
-      const nomme = text.toLowerCase().includes(this.username.toLowerCase());
+      // "joueur 4" (avec un espace) = "Joueur4" : avant, "je suis avec toi joueur 4" n'était pas compris comme pour lui.
+      const nomme = text.toLowerCase().replace(/joueur\s+(\d)/g, 'joueur$1').includes(this.username.toLowerCase());
       const pourTous = !seulsTousLesDeux && !nomme && /(vous|tout le monde|qq1|qqun|quelqu'un|quelquun|personne|les gars)/i.test(text);
       const pourMoi = seulsTousLesDeux || nomme || pourTous;
       // Un vrai joueur cité ne répond que 2 fois sur 3 dans les 2 minutes (analyse/rythme_chat.py) :
       // occupé, il répond parfois seulement quand il a fini son action (il verra le message à ce moment-là).
       const plusTard = this.cfg.agent.humanize && !seulsTousLesDeux && this.actionEnCours && Math.random() < 0.3;
-      const reagir = !plusTard && (pourMoi || !this.cfg.agent.humanize || Math.random() < this.style.bavard);
+      // Pas pour lui : il ne s'en mêle presque jamais si le message vise un autre joueur ou ne dit rien ("merci", "ok"),
+      // et rarement sinon (avant, chaque bot avait style.bavard chances de répondre à TOUT, même entre bots).
+      const pasPourMoi = citeUnAutre(text, this.username, Object.keys(bot.players)) || sansContenu(text);
+      const chanceDeSenMeler = pasPourMoi ? 0.03 : this.style.bavard * 0.3;
+      const reagir = !plusTard && (pourMoi || !this.cfg.agent.humanize || Math.random() < chanceDeSenMeler);
+      // Il retient les coordonnées qu'un joueur donne ("je suis en 0 0") pour pouvoir aller le voir ou lui donner un objet.
+      const pos = positionAnnoncee(text);
+      if (pos) {
+        this.positions[from] = { ...pos, t: Date.now() };
+        bot.positionsAnnoncees = this.positions;
+      }
       // Ce qu'on lui demande reste affiché à part (le modèle n'utilisait jamais son carnet tout seul).
       if (pourMoi) {
         // On ne garde que le dernier message de chaque joueur : "envoie 2 diams" restait affiché 10 min
@@ -383,6 +393,12 @@ class Agent {
       `Ton inventaire : ${Object.entries(inv).map(([n, c]) => `${n} x${c}`).join(', ') || 'vide'}.`,
       `Joueurs que tu vois : ${visibles.join(', ') || 'personne'}.`,
     ];
+    // Ce que ses actions ont vraiment donné : sinon il repromettait "jte les ramène en 2 min" alors que "donner" ratait.
+    const dernieres = this.memory.historique.slice(-4).map((a) => `${a.name} -> ${a.ok ? 'réussi' : 'raté'} (${a.result.slice(0, 70)})`);
+    if (dernieres.length) lignes.push(`Tes dernières actions : ${dernieres.join(' ; ')}`);
+    if (this.memory.engagement && Date.now() - this.memory.engagement.t < 5 * 60000) {
+      lignes.push(`Ce que tu as promis de faire tout de suite : ${this.memory.engagement.text} (si ça rate, dis-le au lieu de repromettre)`);
+    }
     if (this.memory.etape) lignes.push(`Ce que tu fais en ce moment dans ta partie : ${this.memory.etape}.`);
     if (this.memory.reflexion) lignes.push(`Ton intention : ${this.memory.reflexion.intention}`);
     const avis = Object.entries(this.memory.avis);
@@ -653,7 +669,13 @@ class Agent {
     const cle = (n, a) => n + JSON.stringify(Object.fromEntries(Object.entries(a).filter(([k]) => !['note', 'promesse', 'pensee'].includes(k))));
     const deux = this.memory.actions.slice(-2);
     const rate = deux.length === 2 && deux.every((a) => !a.ok && cle(a.name, a.args) === cle(name, args));
-    return rate ? [`${name} a raté 2 fois de suite (${deux[1].result.slice(0, 80)}) : fais autre chose`] : [];
+    if (rate) return [`${name} a raté 2 fois de suite (${deux[1].result.slice(0, 80)}) : fais autre chose`];
+    // Même outil raté 3 fois de suite, même avec d'autres arguments ("creuser 5" puis "creuser 10" à la bedrock).
+    const trois = this.memory.actions.slice(-3);
+    if (trois.length === 3 && trois.every((a) => !a.ok && a.name === name)) {
+      return [`${name} a raté 3 fois de suite (${trois[2].result.slice(0, 80)}) : change complètement d'approche`];
+    }
+    return [];
   }
 
   // Après une décision : une demande d'un joueur en attente passe d'abord.

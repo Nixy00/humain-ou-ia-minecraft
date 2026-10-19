@@ -32,6 +32,12 @@ const SITUATIONS = [
   { nom: 'suite d\'une discussion', bot: 'Joueur5', inventaire: { iron_sword: 1, raw_iron: 3 }, enCours: 'creuser',
     chat: [['Joueur5', 'jai trouve une grotte', 40], ['SAHYGO', 'elle est ou ?', 20], ['SAHYGO', 'joueur5 ?', 3]],
     raison: 'message de SAHYGO : "joueur5 ?"' },
+  { nom: 'promesse impossible (donner a raté)', bot: 'Joueur4', inventaire: { oak_log: 15 }, enCours: 'collecter',
+    historique: [['donner', false, 'Could not find DrAlphaCheat.'], ['donner', false, 'DrAlphaCheat est trop loin pour que tu le voies et tu n as pas ses coordonnées']],
+    chat: [['DrAlphaCheat', 'les 15 de bois je veux bien stp', 120], ['Joueur4', 'je viens te donner les 15 bois tqt', 100], ['DrAlphaCheat', 'tes ou joueur4 ?', 3]],
+    raison: "DrAlphaCheat vient d'écrire : « tes ou joueur4 ? »" },
+  { nom: 'insulte grave', bot: 'Joueur4', inventaire: { oak_log: 3 }, enCours: 'collecter',
+    chat: [['SAHYGO', 'oe ca dit quoi les reuf', 20], ['SAHYGO', 'tg sale noir', 3]], raison: "SAHYGO a écrit à tout le monde : « tg sale noir »" },
   { nom: 'un joueur arrive près de lui', bot: 'Joueur6', inventaire: { oak_planks: 10 }, enCours: 'construire',
     chat: [], raison: 'SAHYGO arrive près de toi', voit: 'SAHYGO' },
 ];
@@ -65,6 +71,7 @@ async function main() {
       a.debutAction = Date.now() - 8000;
       a.actionFin = Promise.resolve();
       a.memory.chat = s.chat.map(([from, text, ilYa]) => ({ type: 'chat', from, text, t: il(ilYa) }));
+      a.memory.historique = (s.historique || []).map(([name, ok, result]) => ({ name, args: {}, ok, result, t: il(30) }));
       a.schedule = () => {}; // on ne lance pas le cerveau des actions ici
       await a.parler(s.raison);
       const d = decisions[0] || {};
