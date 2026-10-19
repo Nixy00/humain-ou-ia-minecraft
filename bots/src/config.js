@@ -49,6 +49,10 @@ module.exports = {
     // Limite de tokens pour toute la partie (0 = pas de limite). Au-delà, plus aucun appel au modèle :
     // les bots restent connectés avec leurs réflexes. Sécurité pour une nuit en autonomie.
     budgetTokens: envInt('LLM_BUDGET_TOKENS', 0),
+    // Le modèle de la passerelle sait réfléchir avant de répondre ("high" seulement, vide = sans réflexion).
+    reasoningEffort: env('LLM_REASONING_EFFORT', ''),
+    // Pour quelles têtes (testé : la réflexion de fond invente beaucoup moins avec, la parole n'y gagne presque rien).
+    reasoningPour: env('LLM_REASONING_POUR', 'reflexion').split(',').map((k) => k.trim()),
   },
   game: {
     id: gameId,

@@ -51,7 +51,8 @@ Appelle l'outil designer.`;
 function reflexionPrompt(observation, historique) {
   return `${observation}\n\nTes dernières actions (de la plus ancienne à la plus récente) :\n${historique || '- aucune'}
 
-Fais le point, comme un joueur qui réfléchit 2 secondes à sa partie (appelle l'outil reflexion) :
+Fais le point, comme un joueur qui réfléchit 2 secondes à sa partie (appelle l'outil reflexion).
+Seulement ce qui s'est vraiment passé d'après tes actions (réussies ou ratées) et le chat ci-dessus : n'invente rien. Sur les autres joueurs, seulement ce que tu as vu ou lu ; si tu ne sais pas, n'en dis rien.
 - resume : ce qui s'est passé ces dernières minutes, ce qui marche ou pas, en quelques phrases courtes.
 - avis : pour chaque autre joueur que tu connais, ce que tu penses de lui (sympa, relou, il t'a aidé, il répond jamais...).
 - intention : ce que tu vas faire les prochaines minutes, dans l'ordre (ton objectif, une promesse, un défi...).
@@ -77,7 +78,7 @@ Comment tu parles :
 - Une insulte grave (raciste, sexiste, homophobe...) : tu ne rigoles pas et tu ne la répètes jamais ; tu recadres court ("calme toi", "c'est pas drôle") ou tu ignores.
 - Tu n'es pas obligé de répondre à tout : une question qui ne te concerne pas ou déjà répondue, tu peux la laisser (dire = "").
 
-Champs : dire = ton message (ou "" si tu ne dis rien) ; engagement = une chose NOUVELLE que tu vas faire tout de suite dans le jeu à cause de cette conversation (ex. "donner 5 cobblestone à Joueur6", "aller vers SAHYGO"), sinon "rien" (continuer ce que tu fais, c'est "rien") ; promesse = ce que tu feras plus tard ; note = un détail à retenir (ce que tu as dit sur ta vie par exemple) ; pensee = pourquoi.`;
+Champs : repond_a = d'abord, en quelques mots, à qui et à quoi tu réagis (ex. "Joueur6 me demande pourquoi je l'ai tapé") : ta réponse doit porter sur CE message, pas sur autre chose ; dire = ton message (ou "" si tu ne dis rien) ; engagement = une chose NOUVELLE que tu vas faire tout de suite dans le jeu à cause de cette conversation (ex. "donner 5 cobblestone à Joueur6", "aller vers SAHYGO"), sinon "rien" (continuer ce que tu fais, c'est "rien") ; promesse = ce que tu feras plus tard ; note = un détail à retenir (ce que tu as dit sur ta vie par exemple) ; pensee = pourquoi.`;
 }
 
 function parolePrompt(situation, fil, raison) {
@@ -86,8 +87,8 @@ function parolePrompt(situation, fil, raison) {
 Conversation (du plus ancien au plus récent) :
 ${fil || '- personne n\'a encore parlé'}
 
-Ce qui se passe : ${raison}.
-Que réponds-tu ? (outil repondre)`;
+CE À QUOI TU RÉAGIS MAINTENANT : ${raison}.
+Réponds à ça (et pas à un autre sujet). Que réponds-tu ? (outil repondre)`;
 }
 
 module.exports = { systemPrompt, turnPrompt, reflexionPrompt, votePrompt, paroleSysteme, parolePrompt };

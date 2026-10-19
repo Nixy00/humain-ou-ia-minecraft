@@ -606,7 +606,7 @@ test('perception : liste de ce qu il peut fabriquer tout de suite', () => {
 test('parole : repond sans toucher a l action ; un engagement reveille le cerveau des actions', async () => {
   const { Agent } = require('../src/agent/agent');
   const { Vec3 } = require('vec3');
-  let reponse = { dire: 'ouais jen ai une quarantaine', engagement: 'rien', pensee: 'il me demande juste' };
+  let reponse = { repond_a: 'Joueur6 me demande de la pierre', dire: 'ouais jen ai une quarantaine', engagement: 'rien', pensee: 'il me demande juste' };
   const gateway = { cfg: { model: 'test', toolChoice: 'auto' }, mode: 'tools',
     chat: async () => ({ message: { role: 'assistant', tool_calls: [{ function: { name: 'repondre', arguments: JSON.stringify(reponse) } }] }, finishReason: 'tool_calls' }) };
   const a = new Agent({ username: 'Joueur4', persona: '', vie: '19 ans, Lille' }, { cfg: { agent: { humanize: false }, llm: { maxFormatRetries: 0 } }, gateway, logger: { write() {}, gameId: 't' } });
@@ -622,7 +622,7 @@ test('parole : repond sans toucher a l action ; un engagement reveille le cervea
   await a.parler('Joueur6 vient d\'écrire : "joueur4 tas de la pierre ?"');
   assert.deepStrictEqual(envoyes, ['ouais jen ai une quarantaine']);
   assert.deepStrictEqual(relances, []); // pas d'engagement : son action continue
-  reponse = { dire: 'ok jte file 10', engagement: 'donner 10 cobblestone à Joueur6' };
+  reponse = { repond_a: 'Joueur6 veut que je lui en passe', dire: 'ok jte file 10', engagement: 'donner 10 cobblestone à Joueur6' };
   await a.parler('Joueur6 vient d\'écrire : "tu men passes ?"');
   assert.strictEqual(a.memory.engagement.text, 'donner 10 cobblestone à Joueur6');
   assert.deepStrictEqual(relances, ["tu t'es engagé dans le chat : donner 10 cobblestone à Joueur6"]);

@@ -89,7 +89,7 @@ async function callTool({ gateway, logger, messages, tools, meta, extraCheck, ma
     const mode = gateway.mode;
     const body =
       mode === 'tools'
-        ? { messages: convo, tools: toOpenAiTools(tools), tool_choice: gateway.cfg.toolChoice }
+        ? { messages: convo, tools: toOpenAiTools(tools), tool_choice: gateway.cfg.toolChoice, ...(gateway.cfg.reasoningEffort && (gateway.cfg.reasoningPour || []).includes(meta.kind) ? { reasoning_effort: gateway.cfg.reasoningEffort, max_tokens: 3000 } : {}) }
         : { messages: [...convo, { role: 'system', content: jsonModeInstructions(tools) }] };
     const callId = randomUUID();
     callIds.push(callId);

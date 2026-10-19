@@ -524,13 +524,14 @@ const OUTIL_PAROLE = {
   parameters: {
     type: 'object',
     properties: {
+      repond_a: { type: 'string', maxLength: 200 },
       dire: { type: 'string', maxLength: 200 },
       engagement: { type: 'string', maxLength: 150 },
       pensee: { type: 'string', maxLength: 300 },
       note: { type: 'string', maxLength: 150 },
       promesse: { type: 'string', maxLength: 150 },
     },
-    required: ['dire', 'engagement'],
+    required: ['repond_a', 'dire', 'engagement'],
   },
 };
 

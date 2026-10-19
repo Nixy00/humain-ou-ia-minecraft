@@ -108,7 +108,7 @@ class Agent {
       const frappeur = { username: source.username };
       this.frappePar[frappeur.username] = Date.now();
       this.onEvent({ type: 'frappe', text: `${frappeur.username} t'a frappé (vie ${Math.round(bot.health)}/20)` }, null);
-      this.entendre(`${frappeur.username} vient de te frapper (vie ${Math.round(bot.health)}/20) : réagis, et engage-toi à te battre ou fuir si tu veux`);
+      this.entendre(`${frappeur.username} vient de te frapper (vie ${Math.round(bot.health)}/20) : réagis, et engage-toi à te battre ou fuir si tu veux`, frappeur.username);
     });
 
     bot.on('chat', (from, text) => {
@@ -151,12 +151,12 @@ class Agent {
       }
       // C'est la parole qui répond ; les actions continuent (sauf si elle s'engage à faire quelque chose).
       this.onEvent({ type: 'chat', from, text }, null);
-      if (reagir) this.entendre(`${from} vient d'écrire : "${text}"`);
+      if (reagir) this.entendre(`${from} vient d'écrire : "${text}"`, from);
     });
     bot.on('whisper', (from, text) => {
       if (from === this.username) return;
       this.onEvent({ type: 'whisper', from, text }, null);
-      this.entendre(`${from} t'a écrit en privé : "${text}"`);
+      this.entendre(`${from} t'a écrit en privé : "${text}"`, from);
     });
     // Messages du serveur (tâches, désignations, arrivées...) : hors chat des joueurs.
     bot.on('messagestr', (text, position) => {
@@ -248,7 +248,7 @@ class Agent {
       if (d < 12 && Date.now() - (this.dejaVu[p.username] || 0) > 180000) {
         this.dejaVu[p.username] = Date.now();
         this.onEvent({ type: 'joueur', text: `${p.username} arrive près de toi (${Math.round(d)} blocs)` }, null);
-        if (Math.random() < this.style.bavard) this.entendre(`${p.username} arrive près de toi (${Math.round(d)} blocs)`);
+        if (Math.random() < this.style.bavard) this.entendre(`${p.username} arrive près de toi (${Math.round(d)} blocs)`, p.username);
       }
     }
   }
@@ -363,9 +363,9 @@ class Agent {
   }
 
   // Plusieurs messages rapprochés : il ne répond qu'une fois, après un petit temps de lecture.
-  entendre(raison) {
+  entendre(raison, de = null) {
     clearTimeout(this.paroleTimer);
-    this.paroleTimer = setTimeout(() => this.parler(raison), this.cfg.agent.chatDebounceMs);
+    this.paroleTimer = setTimeout(() => this.parler(raison, de), this.cfg.agent.chatDebounceMs);
   }
 
   // Le fil de la conversation comme un dialogue, avec à qui chaque message s'adresse
@@ -381,7 +381,10 @@ class Agent {
   }
 
   // Ce que la parole a besoin de savoir sur la situation (court, pour qu'elle reste centrée sur la conversation).
-  situationCourte() {
+  // de = le joueur qui vient de lui parler : ses promesses ne sont montrées que si elles le concernent.
+  // Avant, il ramenait tout à sa promesse de 15 bois ("SAHYGO arrive" -> "ouais jarrive" + donner le bois à DrAlphaCheat).
+  situationCourte(de = null) {
+    const leConcerne = (t) => Boolean(de) && t.toLowerCase().includes(de.toLowerCase());
     const bot = this.bot;
     const inv = {};
     for (const i of bot.inventory.items()) inv[i.name] = (inv[i.name] || 0) + i.count;
@@ -396,8 +399,8 @@ class Agent {
     // Ce que ses actions ont vraiment donné : sinon il repromettait "jte les ramène en 2 min" alors que "donner" ratait.
     const dernieres = this.memory.historique.slice(-4).map((a) => `${a.name} -> ${a.ok ? 'réussi' : 'raté'} (${a.result.slice(0, 70)})`);
     if (dernieres.length) lignes.push(`Tes dernières actions : ${dernieres.join(' ; ')}`);
-    if (this.memory.engagement && Date.now() - this.memory.engagement.t < 5 * 60000) {
-      lignes.push(`Ce que tu as promis de faire tout de suite : ${this.memory.engagement.text} (si ça rate, dis-le au lieu de repromettre)`);
+    if (this.memory.engagement && Date.now() - this.memory.engagement.t < 5 * 60000 && leConcerne(this.memory.engagement.text)) {
+      lignes.push(`Ce que tu as promis à ${de} : ${this.memory.engagement.text} (si ça rate, dis-le au lieu de repromettre)`);
     }
     if (this.memory.etape) lignes.push(`Ce que tu fais en ce moment dans ta partie : ${this.memory.etape}.`);
     if (this.memory.reflexion) lignes.push(`Ton intention : ${this.memory.reflexion.intention}`);
@@ -405,17 +408,17 @@ class Agent {
     if (avis.length) lignes.push(`Ce que tu penses des autres : ${avis.map(([j, a]) => `${j} = ${a}`).join(' ; ')}`);
     const notes = this.memory.notes.slice(-5).map((n) => n.text);
     if (notes.length) lignes.push(`Ce que tu as noté (dont ce que tu as raconté sur toi) : ${notes.join(' ; ')}`);
-    const promesses = this.memory.promesses.filter((p) => Date.now() - p.t < 20 * 60000).map((p) => p.text);
-    if (promesses.length) lignes.push(`Tes promesses : ${promesses.join(' ; ')}`);
+    const promesses = this.memory.promesses.filter((p) => Date.now() - p.t < 20 * 60000 && leConcerne(p.text)).map((p) => p.text);
+    if (promesses.length) lignes.push(`Ce que tu as promis à ${de} : ${promesses.join(' ; ')}`);
     return lignes.join('\n');
   }
 
   // LA PAROLE : quand on lui parle ou qu'il se passe un truc marquant. Elle ne décide pas des actions :
   // si elle s'engage ("ok jte file 5 pierres"), le cerveau des actions est réveillé pour le faire (cohérence).
-  async parler(raison) {
+  async parler(raison, de = null) {
     if (this.stopping || !this.mcData || !this.bot?.entity) return;
     if (this.parle) { // une seule réponse à la fois : on garde la dernière raison pour après
-      this.raisonParole = raison;
+      this.raisonParole = { raison, de };
       return;
     }
     this.parle = true;
@@ -428,7 +431,7 @@ class Agent {
         logger: this.logger,
         messages: [
           { role: 'system', content: paroleSysteme(this.username, this.persona, this.vie, this.caractere, this.humeur) },
-          { role: 'user', content: parolePrompt(this.situationCourte(), this.filConversation(), raison) },
+          { role: 'user', content: parolePrompt(this.situationCourte(de), this.filConversation(), raison) },
         ],
         tools: [OUTIL_PAROLE],
         meta: { agent: this.username, decisionId, kind: 'parole' },
@@ -437,13 +440,13 @@ class Agent {
       });
       const llmMs = Date.now() - t0;
       if (!choice) return;
-      const { dire, engagement, note, promesse, pensee } = choice.args;
+      const { repond_a: repondA, dire, engagement, note, promesse, pensee } = choice.args;
       this.retenirChamps(decisionId, note, promesse);
       // "rien" ou "continuer..." ne sont pas des engagements : son action continue, pas besoin de réveiller le cerveau.
       const engage = engagement && !/^(rien|aucun|non|-|continuer.*)?\s*$/i.test(engagement.trim()) ? engagement.trim() : null;
       this.logger.write('decisions', {
         agent: this.username, decision_id: decisionId, kind: 'parole', reason: raison, ok: true, tool: 'repondre',
-        dire: dire || null, engagement: engage, pensee: pensee ?? null, llm_call_ids: choice.callIds, llm_ms: llmMs,
+        repond_a: repondA ?? null, dire: dire || null, engagement: engage, pensee: pensee ?? null, llm_call_ids: choice.callIds, llm_ms: llmMs,
       });
       if (pensee) this.log(`parole [pense : ${pensee}]${engage ? ` (engagement : ${engage})` : ''}`);
       if (engage) {
@@ -459,7 +462,7 @@ class Agent {
       if (this.raisonParole) {
         const r = this.raisonParole;
         this.raisonParole = null;
-        this.parler(r);
+        this.parler(r.raison, r.de);
       }
     }
   }
@@ -659,7 +662,7 @@ class Agent {
         this.logger.write('events', { agent: this.username, type: 'laisse_faire', text: `<${from}> ${text}` });
         return;
       }
-      this.parler(`${from} a écrit à tout le monde : "${text}"`);
+      this.parler(`${from} a écrit à tout le monde : "${text}"`, from);
     }, delaiReaction(this.coutPourMoi(from, text).cout));
   }
 
