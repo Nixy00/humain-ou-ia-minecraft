@@ -632,8 +632,24 @@ class Agent {
       this.logger.write('events', { agent: this.username, type: 'objectif_atteint', text: `${o.nombre} ${o.objet}` });
       this.memory.objectifPerso = null;
     }
-    const but = objectifDuMoment(this.objectifs.filter((o) => !(o === 'cabane' && bot.cabaneFinie)), inv);
+    const fait = (o) => (o === 'cabane' && bot.cabaneFinie) || (o === 'ferme' && bot.fermeFaite) || (o === 'enclos' && bot.animauxEnclos >= 2);
+    const but = objectifDuMoment(this.objectifs.filter((o) => !fait(o)), inv);
     if (!but) return null;
+    const compte = (fin) => inv.filter((i) => i.name.endsWith(fin)).reduce((s, i) => s + i.count, 0);
+    if (but.objet === 'ferme') {
+      if (compte('wheat_seeds') === 0) return prochaineEtape('wheat_seeds', inv, this.recettes, 6);
+      return 'semer (6 graines de blé près de la maison de l\'équipe)';
+    }
+    if (but.objet === 'enclos') {
+      if (!bot.enclos && !bot.chantierEnclos) {
+        if (compte('_fence') < 15) return prochaineEtape('oak_fence', inv, this.recettes, 15);
+        if (compte('_fence_gate') === 0) return prochaineEtape('oak_fence_gate', inv, this.recettes, 1);
+        return "enclos (construire l'enclos)";
+      }
+      if (bot.chantierEnclos) return "enclos (finir l'enclos)";
+      if (compte('wheat') === 0) return prochaineEtape('wheat', inv, this.recettes, 1);
+      return 'attirer (une vache ou un mouton dans l\'enclos avec du blé en main)';
+    }
     if (but.objet === 'cabane') {
       // Assez de blocs pour ce qu'il reste à poser ? Sinon l'étape est d'aller en chercher.
       const reste = bot.chantier ? bot.chantier.restants.length : NB_BLOCS;

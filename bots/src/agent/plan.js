@@ -10,6 +10,8 @@ const SOURCES = {
   iron_ingot: { cuire: 'raw_iron' },
   diamond: { bloc: 'diamond_ore', outil: 'iron_pickaxe', conseil: 'creuser vers y=-58' },
   beef: { animal: 'cow' },
+  wheat_seeds: { bloc: 'short_grass', conseil: "l'herbe haute donne parfois des graines" },
+  wheat: { texte: 'recolter (le blé mûr de ta ferme)' },
   cooked_beef: { cuire: 'beef' },
   white_wool: { animal: 'sheep' },
   porkchop: { animal: 'pig' },
@@ -55,6 +57,7 @@ function etape(item, n, inv, recettes, profondeur = 0) {
       || etape('furnace', 1, inv, recettes, profondeur + 1)
       || `cuire ${source.cuire} (${manque}), avec du charbon ou du bois`;
   }
+  if (source && source.texte) return source.texte;
   if (source && source.animal) return `chasser ${source.animal} (${manque} ${item} à avoir)`;
   if (source) {
     if (source.outil) {

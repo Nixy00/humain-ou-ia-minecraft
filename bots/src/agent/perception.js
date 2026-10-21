@@ -49,7 +49,7 @@ const A_FABRIQUER = ['crafting_table', 'stick', 'torch', 'furnace', 'chest', 'wh
   'wooden_pickaxe', 'stone_pickaxe', 'iron_pickaxe', 'diamond_pickaxe', 'wooden_axe', 'stone_axe', 'iron_axe',
   'wooden_sword', 'stone_sword', 'iron_sword', 'diamond_sword', 'stone_shovel', 'iron_shovel',
   'iron_helmet', 'iron_chestplate', 'iron_leggings', 'iron_boots', 'diamond_helmet', 'diamond_chestplate', 'diamond_leggings', 'diamond_boots',
-  'iron_block', 'diamond_block', 'bread'];
+  'iron_block', 'diamond_block', 'bread', 'wooden_hoe', 'stone_hoe', 'oak_fence', 'oak_fence_gate'];
 
 // Ce qu'il peut fabriquer tout de suite : il devinait les recettes et 39 % de ses "fabriquer" échouaient.
 function fabricables(bot) {

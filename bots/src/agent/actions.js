@@ -6,11 +6,12 @@
 // de Mindcraft : Copyright (c) 2024 Kolby Nottingham, licence MIT,
 // https://github.com/mindcraft-bots/mindcraft
 
-const { goals } = require('mineflayer-pathfinder');
+const { goals, Movements } = require('mineflayer-pathfinder');
 const { Vec3 } = require('vec3');
 const { isHostile, ANIMAUX } = require('./perception');
 const { frapper, delaiEntreCoups } = require('./humanizer');
 const { plansCabane, trouverTerrain, choisirBloc, vide } = require('./construction');
+const { NOURRITURE_ANIMAL, plansEnclos, dansEnclos, bleMur, terreASemer } = require('./ferme');
 
 // Champs communs. Leurs explications sont dans la consigne système (prompt.js) et pas ici :
 // répétées dans les 23 outils, elles faisaient 40 % de la taille de chaque requête.
@@ -56,6 +57,11 @@ const TOOLS = [
   tool('creuser', 'Creuser droit vers le bas (pour descendre vers les minerais : fer vers y=16, diamant vers y=-58).', { blocs: { type: 'integer', minimum: 1, maximum: 20 } }, ['blocs']),
   tool('remonter', 'Remonter à la surface.', {}),
   tool('monter', 'Monter sur place en posant des blocs sous tes pieds (sauter + poser), pour sortir d\'un trou ou atteindre un endroit en hauteur.', { blocs: { type: 'integer', minimum: 1, maximum: 10 } }, ['blocs']),
+  tool('semer', 'Labourer la terre près de toi avec une houe et planter des graines de blé (wheat_seeds).', { nombre: { type: 'integer', minimum: 1, maximum: 9 } }, ['nombre']),
+  tool('recolter', 'Récolter le blé mûr de ta ferme et le replanter.', {}),
+  tool('enclos', "Construire un enclos de 5x5 (15 barrières et 1 portillon) près de toi. Relance-le pour continuer le chantier.", {}),
+  tool('attirer', "Attirer un animal dans ton enclos en tenant sa nourriture (cow et sheep : wheat, pig : carrot, chicken : wheat_seeds).", { animal: { type: 'string', enum: ['cow', 'sheep', 'pig', 'chicken'] } }, ['animal']),
+  tool('reproduire', 'Donner à manger à deux animaux pour qu\'un petit naisse.', { animal: { type: 'string', enum: ['cow', 'sheep', 'pig', 'chicken'] } }, ['animal']),
   tool('construire', 'Construire une cabane de 5x5 près de toi (environ 70 blocs : cobblestone ou planches). Relance-la pour continuer le chantier.', {}),
 ];
 
@@ -321,6 +327,131 @@ const executors = {
     return mindcraft(bot, 'digDown', Math.min(blocs, possible));
   },
 
+  async semer(bot, { nombre }) {
+    if (!bot.inventory.items().some((i) => i.name.endsWith('_hoe'))) throw new Error('il te faut une houe (fabriquer wooden_hoe)');
+    if (!bot.inventory.items().some((i) => i.name === 'wheat_seeds')) throw new Error("il te faut des graines de blé : casse de l'herbe (collecter short_grass)");
+    const cases = terreASemer(bot, nombre);
+    if (cases.length === 0) throw new Error('pas de terre libre ici pour semer, va un peu plus loin');
+    let semees = 0;
+    for (const c of cases) {
+      if (bot.interrompre) break;
+      try {
+        await mindcraft(bot, 'tillAndSow', c.x, c.y, c.z, 'wheat_seeds');
+        semees++;
+        bot.champ = (bot.champ || []).concat([c]);
+      } catch { /* case ratée, on passe à la suivante */ }
+    }
+    if (semees === 0) throw new Error("aucune graine plantée (plus de graines ou terre impossible à labourer)");
+    if (bot.champ.length >= 6) bot.fermeFaite = true;
+    return `${semees} graines de blé semées (le blé met quelques minutes à pousser)`;
+  },
+
+  async recolter(bot) {
+    const murs = bleMur(bot);
+    if (murs.length === 0) throw new Error("pas de blé mûr pour l'instant, il pousse en quelques minutes : fais autre chose en attendant");
+    let recoltes = 0;
+    for (const p of murs.slice(0, 9)) {
+      if (bot.interrompre) break;
+      try {
+        await mindcraft(bot, 'breakBlockAt', p.x, p.y, p.z);
+        recoltes++;
+        await mindcraft(bot, 'tillAndSow', p.x, p.y - 1, p.z, 'wheat_seeds').catch(() => {}); // on replante tout de suite
+      } catch { /* bloc raté, on passe au suivant */ }
+    }
+    await mindcraft(bot, 'pickupNearbyItems').catch(() => {});
+    return `${recoltes} blés récoltés et replantés`;
+  },
+
+  async enclos(bot) {
+    // Le chantier est gardé sur le bot, comme pour la cabane : on reprend là où on s'était arrêté.
+    if (!bot.chantierEnclos) {
+      const barrieres = bot.inventory.items().filter((i) => i.name.endsWith('_fence')).reduce((s, i) => s + i.count, 0);
+      const portillon = bot.inventory.items().some((i) => i.name.endsWith('_fence_gate'));
+      if (barrieres < 15 || !portillon) {
+        throw new Error(`il te faut 15 barrières et 1 portillon (tu as ${barrieres} barrière(s)${portillon ? '' : ', pas de portillon'}) : fabriquer oak_fence et oak_fence_gate`);
+      }
+      const origine = trouverTerrain(bot);
+      if (!origine) throw new Error("pas d'endroit plat et dégagé de 5x5 ici, va un peu plus loin");
+      bot.chantierEnclos = { origine, restants: plansEnclos(origine) };
+    }
+    const c = bot.chantierEnclos;
+    let poses = 0;
+    const fin = Date.now() + 45000;
+    while (c.restants.length > 0 && Date.now() < fin && !bot.interrompre) {
+      const b = c.restants[0];
+      if (!vide(bot, b.pos)) {
+        c.restants.shift();
+        continue;
+      }
+      const item = bot.inventory.items().find((i) => i.name.endsWith(b.portillon ? '_fence_gate' : '_fence'));
+      if (!item) throw new Error("plus assez de barrières ou pas de portillon : fabriquer oak_fence ou oak_fence_gate");
+      try {
+        await mindcraft(bot, 'placeBlock', item.name, b.pos.x, b.pos.y, b.pos.z);
+        poses++;
+        c.restants.shift();
+      } catch {
+        b.essais = (b.essais || 0) + 1;
+        c.restants.shift();
+        if (b.essais < 3) c.restants.push(b);
+      }
+    }
+    if (c.restants.length === 0) {
+      bot.enclos = { origine: c.origine };
+      bot.chantierEnclos = null;
+      return `enclos fini en ${c.origine.x} ${c.origine.z} : attire des animaux dedans avec leur nourriture (attirer)`;
+    }
+    return `enclos : ${poses} barrières posées, encore ${c.restants.length} (relance enclos)`;
+  },
+
+  async attirer(bot, { animal }) {
+    if (!bot.enclos) throw new Error("fais d'abord un enclos (enclos)");
+    const appat = bot.inventory.items().find((i) => NOURRITURE_ANIMAL[animal].includes(i.name));
+    if (!appat) throw new Error(`il te faut ${NOURRITURE_ANIMAL[animal][0]} en main pour attirer un ${animal}`);
+    const bete = bot.nearestEntity((e) => e.name === animal && !dansEnclos(bot.enclos, e.position) && e.position.distanceTo(bot.entity.position) < 48);
+    if (!bete) throw new Error(`aucun ${animal} hors de l'enclos à moins de 48 blocs, explore pour en trouver`);
+    await bot.equip(appat, 'hand');
+    // On marche (sans courir) pour que l'animal suive, et on ne casse rien en chemin.
+    const avant = bot.pathfinder.movements;
+    const lent = new Movements(bot);
+    lent.allowSprinting = false;
+    lent.canDig = false;
+    bot.pathfinder.setMovements(lent);
+    const o = bot.enclos.origine;
+    const ouvrirPortillon = async (ouvert) => {
+      const portillon = bot.blockAt(o.offset(2, 0, 0));
+      if (portillon && portillon.name.endsWith('_fence_gate') && portillon.getProperties().open !== ouvert) await bot.activateBlock(portillon);
+    };
+    try {
+      await allerAvecLimite(bot, new goals.GoalFollow(bete, 3), 30000); // aller chercher l'animal
+      await allerAvecLimite(bot, new goals.GoalNear(o.x + 2, o.y, o.z - 1, 1), 40000); // revenir devant le portillon
+      await ouvrirPortillon(true);
+      await allerAvecLimite(bot, new goals.GoalNear(o.x + 2, o.y, o.z + 2, 0), 15000); // entrer au centre
+      await sleep(3000); // laisser l'animal entrer derrière lui
+      await allerAvecLimite(bot, new goals.GoalNear(o.x + 2, o.y, o.z - 1, 0), 15000); // ressortir
+      await ouvrirPortillon(false);
+    } finally {
+      bot.pathfinder.setMovements(avant);
+    }
+    const dedans = Object.values(bot.entities).filter((e) => NOURRITURE_ANIMAL[e.name] && dansEnclos(bot.enclos, e.position));
+    bot.animauxEnclos = dedans.length;
+    return `${dedans.filter((e) => e.name === animal).length} ${animal} dans l'enclos (${dedans.length} animaux en tout)`;
+  },
+
+  async reproduire(bot, { animal }) {
+    const appat = bot.inventory.items().find((i) => NOURRITURE_ANIMAL[animal].includes(i.name));
+    if (!appat || appat.count < 2) throw new Error(`il te faut 2 ${NOURRITURE_ANIMAL[animal][0]} pour les faire se reproduire`);
+    const betes = Object.values(bot.entities)
+      .filter((e) => e.name === animal && e.position.distanceTo(bot.entity.position) < 12).slice(0, 2);
+    if (betes.length < 2) throw new Error(`il faut 2 ${animal} près de toi`);
+    await bot.equip(appat, 'hand');
+    for (const b of betes) {
+      await allerAvecLimite(bot, new goals.GoalFollow(b, 2), 15000);
+      await bot.activateEntity(b);
+      await sleep(500);
+    }
+    return `deux ${animal} nourris : un petit devrait naître`;
+  },
+
   async construire(bot) {
     // Le chantier est gardé sur le bot : on reprend là où on s'était arrêté.
     if (!bot.chantier) {
@@ -487,6 +618,8 @@ const OUTILS_JOUEURS = ['aller_vers_joueur', 'suivre_joueur', 'regarder_joueur',
 const OUTILS_COFFRE = ['voir_coffre', 'prendre_coffre', 'deposer_coffre'];
 const OUTILS_COMBAT = ['se_defendre', 'fuir'];
 
+const aUnItem = (bot, fin) => bot.inventory.items().some((i) => i.name.endsWith(fin));
+
 function outilsUtiles(bot) {
   const pos = bot.entity.position;
   const autres = Object.keys(bot.players).length > 1;
@@ -505,6 +638,10 @@ function outilsUtiles(bot) {
     || (!animal && t.name === 'chasser')
     || (!blocs && t.name === 'construire')
     || (!joueurProche && t.name === 'combattre')
+    || (!aUnItem(bot, '_hoe') && t.name === 'semer')
+    || (!bot.champ && t.name === 'recolter')
+    || (!bot.chantierEnclos && !aUnItem(bot, '_fence') && t.name === 'enclos')
+    || (!bot.enclos && (t.name === 'attirer' || t.name === 'reproduire'))
     || (!autres && OUTILS_JOUEURS.includes(t.name))
     || (!coffre && OUTILS_COFFRE.includes(t.name))
     || (!monstre && OUTILS_COMBAT.includes(t.name))

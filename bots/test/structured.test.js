@@ -761,3 +761,27 @@ test('journaux : un fichier par bot quand chaque bot a son programme', async () 
   await tous.close();
   assert.deepStrictEqual(fs.readdirSync(dossier).sort(), ['actions-Joueur4.jsonl', 'actions.jsonl']);
 });
+
+test('ferme : enclos de 16 barrieres avec un portillon, interieur de 3 x 3', () => {
+  const { plansEnclos, dansEnclos } = require('../src/agent/ferme');
+  const { Vec3 } = require('vec3');
+  const plans = plansEnclos(new Vec3(10, 64, 20));
+  assert.strictEqual(plans.length, 16);
+  assert.strictEqual(plans.filter((b) => b.portillon).length, 1);
+  const enclos = { origine: new Vec3(10, 64, 20) };
+  assert.ok(dansEnclos(enclos, new Vec3(12.5, 64, 22.5))); // le centre
+  assert.ok(!dansEnclos(enclos, new Vec3(10.5, 64, 22.5))); // sur la barrière
+});
+
+test('fermier : graines, puis semer, puis barrieres pour l enclos', async () => {
+  const { Agent } = require('../src/agent/agent');
+  const mc = await import('../src/mindcraft/mcdata.mjs');
+  mc.init('1.20.4');
+  const a = new Agent(require('../agents.json')[0], { cfg: { agent: { mission: '' } }, gateway: {}, logger: { write() {} } });
+  a.recettes = mc.getItemCraftingRecipes;
+  a.mcData = require('minecraft-data')('1.20.4');
+  const bot = (inv, extra = {}) => ({ ...extra, inventory: { items: () => Object.entries(inv).map(([name, count]) => ({ name, count })) } });
+  assert.match(a.etapeDuMoment(bot({ wooden_hoe: 1 })), /^collecter short_grass/);
+  assert.match(a.etapeDuMoment(bot({ wooden_hoe: 1, wheat_seeds: 8 })), /^semer/);
+  assert.match(a.etapeDuMoment(bot({ wooden_hoe: 1 }, { fermeFaite: true })), /^collecter oak_log/); // bois pour les barrières
+});
