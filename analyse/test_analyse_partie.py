@@ -34,3 +34,11 @@ class TestResume(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_fusionne_les_fichiers_de_chaque_bot(tmp_path):
+    # Avec lancer.sh, chaque bot écrit ses propres fichiers (actions-Joueur4.jsonl...) : la lecture les fusionne.
+    from analyse_partie import lire
+    (tmp_path / "actions-Joueur4.jsonl").write_text(json.dumps({"ts": "2", "agent": "Joueur4"}), encoding="utf-8")
+    (tmp_path / "actions-Joueur5.jsonl").write_text(json.dumps({"ts": "1", "agent": "Joueur5"}), encoding="utf-8")
+    assert [l["agent"] for l in lire(tmp_path, "actions")] == ["Joueur5", "Joueur4"]

@@ -14,10 +14,12 @@ from pathlib import Path
 
 
 def lire(dossier, nom):
-    fichier = Path(dossier) / f"{nom}.jsonl"
-    if not fichier.exists():
-        return []
-    return [json.loads(ligne) for ligne in fichier.read_text(encoding="utf-8").splitlines() if ligne.strip()]
+    # actions.jsonl, ou actions-Joueur4.jsonl, actions-Joueur5.jsonl... (un fichier par bot) : on fusionne tout.
+    fichiers = sorted(Path(dossier).glob(f"{nom}.jsonl")) + sorted(Path(dossier).glob(f"{nom}-*.jsonl"))
+    lignes = []
+    for fichier in fichiers:
+        lignes += [json.loads(ligne) for ligne in fichier.read_text(encoding="utf-8").splitlines() if ligne.strip()]
+    return sorted(lignes, key=lambda l: l.get("ts", ""))
 
 
 def mediane(valeurs):

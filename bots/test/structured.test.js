@@ -743,3 +743,18 @@ test('filtre : un message avec une insulte grave n est jamais envoye', () => {
   assert.strictEqual(filtrerMessage("jsais pas c'est qui le sale noir", []), null);
   assert.strictEqual(filtrerMessage('calme toi', []), 'calme toi');
 });
+
+test('journaux : un fichier par bot quand chaque bot a son programme', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { JsonlLogger } = require('../src/observability/logger');
+  const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'partie-'));
+  const l4 = new JsonlLogger(dossier, 'test', 'Joueur4');
+  const tous = new JsonlLogger(dossier, 'test');
+  l4.write('actions', { agent: 'Joueur4' });
+  tous.write('actions', { agent: 'Joueur5' });
+  await l4.close();
+  await tous.close();
+  assert.deepStrictEqual(fs.readdirSync(dossier).sort(), ['actions-Joueur4.jsonl', 'actions.jsonl']);
+});

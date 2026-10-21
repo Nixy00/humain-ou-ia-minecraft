@@ -1,6 +1,8 @@
 // Lanceur : démarre les agents décrits dans agents.json.
-// Usage : npm start            -> tous les agents
+// Usage : npm start            -> tous les agents dans un seul programme
 //         npm start -- Joueur4 -> seulement les agents nommés
+// En partie, chaque bot a son propre programme (lancer.sh) : il ne fait pas attendre les autres
+// quand il calcule un chemin, il a sa propre file d'appels au modèle, et s'il plante il est seul à tomber.
 // Plusieurs agents sans humains = mode de parties automatiques (tests).
 
 const fs = require('fs');
@@ -18,8 +20,9 @@ if (selected.length === 0) {
   process.exit(1);
 }
 
-const logger = new JsonlLogger(cfg.game.logDir, cfg.game.id);
-const gateway = new Gateway(cfg.llm); // partagée : le limiteur de débit vaut pour tous les agents
+// Un seul bot dans ce programme : ses journaux portent son nom (plusieurs programmes écrivent dans le même dossier).
+const logger = new JsonlLogger(cfg.game.logDir, cfg.game.id, selected.length === 1 ? selected[0].username : '');
+const gateway = new Gateway(cfg.llm); // le limiteur de débit vaut pour les agents de ce programme
 logger.write('events', {
   type: 'lancement',
   agents: selected.map((p) => p.username),

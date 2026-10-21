@@ -10,9 +10,13 @@ if (!dossier) {
   process.exit(1);
 }
 
+// decisions.jsonl, ou decisions-Joueur4.jsonl, decisions-Joueur5.jsonl... (un fichier par bot) : on fusionne tout.
 const lire = (nom) => {
-  const f = path.join(dossier, nom);
-  return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
+  const base = nom.replace('.jsonl', '');
+  return fs.readdirSync(dossier)
+    .filter((f) => f === `${base}.jsonl` || (f.startsWith(`${base}-`) && f.endsWith('.jsonl')))
+    .flatMap((f) => fs.readFileSync(path.join(dossier, f), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse))
+    .sort((a, b) => (a.ts < b.ts ? -1 : 1));
 };
 
 const lignes = [];
