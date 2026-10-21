@@ -76,5 +76,7 @@ module.exports = {
     vuePort: envInt('AGENT_VUE_PORT', 0),
     // Mission donnée par l'organisateur (tests, en attendant les tâches du plugin). Vide = pas de mission.
     mission: env('AGENT_MISSION', ''),
+    // Objectif d'équipe pour une partie de test en coopération (vide = chacun joue pour soi).
+    equipe: env('AGENT_EQUIPE', ''),
   },
 };

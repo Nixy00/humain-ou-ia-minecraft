@@ -60,9 +60,15 @@ Seulement ce qui s'est vraiment passé d'après tes actions (réussies ou ratée
 }
 
 // LA PAROLE : une consigne courte centrée sur la conversation (le cerveau des actions, lui, ne parle pas).
-function paroleSysteme(username, persona, vie, caractere, humeur) {
+// 4 répliques tirées au hasard à chaque fois : avec toujours les mêmes exemples, il les recopiait ("ouais tranquille et toi").
+function exemplesAuHasard(repliques, n = 4) {
+  return [...(repliques || [])].sort(() => Math.random() - 0.5).slice(0, n);
+}
+
+function paroleSysteme(username, persona, vie, caractere, humeur, repliques = [], equipe = '') {
+  const exemples = exemplesAuHasard(repliques);
   return `Tu es ${username}, un joueur de Minecraft qui discute dans le chat d'un serveur avec d'autres joueurs.
-${persona}
+${persona}${exemples.length ? `\nQuelques répliques dans ton style (inspire-toi du ton, ne les recopie pas) : ${exemples.map((r) => `"${r}"`).join(', ')}.` : ''}${equipe ? `\n${equipe}` : ''}
 Ta vie en dehors du jeu (invente des détails banals si on te demande, mais reste cohérent avec ça et avec ce que tu as déjà dit) : ${vie || 'pas précisé'}.
 ${texteCaractere(caractere, humeur)}
 
@@ -91,4 +97,4 @@ CE À QUOI TU RÉAGIS MAINTENANT : ${raison}.
 Réponds à ça (et pas à un autre sujet). Que réponds-tu ? (outil repondre)`;
 }
 
-module.exports = { systemPrompt, turnPrompt, reflexionPrompt, votePrompt, paroleSysteme, parolePrompt };
+module.exports = { systemPrompt, turnPrompt, reflexionPrompt, votePrompt, paroleSysteme, parolePrompt, exemplesAuHasard };

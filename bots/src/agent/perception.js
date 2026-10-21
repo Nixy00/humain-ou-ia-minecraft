@@ -143,6 +143,7 @@ function observe(bot, mcData, memory) {
     const f = fabricables(bot);
     lines.push(`Tu peux fabriquer maintenant : ${f.length ? f.join(', ') : "rien d'utile"}.`);
   }
+  if (memory.equipe) lines.push(memory.equipe);
   if (memory.envie) lines.push(`Ce que tu as envie de faire dans cette partie : ${memory.envie}`);
   // Ce qu'il a décidé à sa dernière réflexion (agent.js, reflechir).
   if (memory.reflexion) {

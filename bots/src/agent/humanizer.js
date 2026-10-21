@@ -87,11 +87,12 @@ function delaiEntreCoups() {
   return Math.max(300, gauss(650, 150));
 }
 
-// Ce qui sonnait faux en partie (1 h de test : 22 % d'argot contre 5 % chez de vrais joueurs, 15 % de messages vides) :
-// - de l'argot alors qu'il en a déjà mis dans un de ses 4 derniers messages : on l'enlève ;
+// Ce qui sonnait faux (banc d'essai : "frero" dans 24 % des messages, "wsh" et "tkt" dans 11 %, contre environ 5 %
+// d'argot chez de vrais joueurs) :
+// - un tic déjà utilisé dans ses 5 derniers messages est enlevé, et au plus un tic par message ;
 // - un message vide ("encore", "..", "mdr" tout seul) ou déjà envoyé dans ses 10 derniers : on ne l'envoie pas.
-const ARGOT = ['mdr', 'ptdr', 'wsh', 'tkt', 'frr', 'wtf', 'lol'];
-const aDeLArgot = (t) => t.toLowerCase().split(/[^a-zà-ÿ]+/).some((mot) => ARGOT.includes(mot));
+const TICS = ['mdr', 'ptdr', 'wsh', 'tkt', 'tqt', 'frr', 'frero', 'fréro', 'reuf', 'wtf', 'lol'];
+const mots = (t) => t.toLowerCase().split(/[^a-zà-ÿ]+/).filter(Boolean);
 
 // Insultes graves (racistes, homophobes...) : un message qui en contient n'est jamais envoyé, même si le modèle
 // la reprend en répondant (testé : "c'est qui le sale noir" en réponse à une insulte). Garde-fou du code, pas de la consigne.
@@ -100,9 +101,14 @@ const INSULTES_GRAVES = /\b(n[eè]gr\w*|negro\w*|sale noir|sale arabe|bougnoul\w
 function filtrerMessage(texte, mesDerniers) {
   let t = String(texte || '').trim();
   if (INSULTES_GRAVES.test(t)) return null;
-  if (mesDerniers.slice(-4).some(aDeLArgot)) {
-    t = t.split(' ').filter((mot) => !ARGOT.includes(mot.toLowerCase().replace(/[^a-z]/g, ''))).join(' ').trim();
-  }
+  const recents = new Set(mesDerniers.slice(-5).flatMap(mots).filter((m) => TICS.includes(m)));
+  let tics = 0;
+  t = t.split(' ').filter((mot) => {
+    const m = mot.toLowerCase().replace(/[^a-zà-ÿ]/g, '');
+    if (!TICS.includes(m)) return true;
+    tics++;
+    return !recents.has(m) && tics === 1;
+  }).join(' ').replace(/^[\s,]+|[\s,]+$/g, '').trim();
   if (!t || /^(encore|\.+|mdr|ptdr|lol)$/i.test(t)) return null;
   if (mesDerniers.slice(-10).some((m) => m.toLowerCase() === t.toLowerCase())) return null;
   return t;

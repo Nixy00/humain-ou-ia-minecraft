@@ -475,8 +475,11 @@ test('profils : l etape suit le premier objectif pas encore atteint', async () =
   a.mcData = require('minecraft-data')('1.20.4');
   const bot = (inv) => ({ inventory: { items: () => Object.entries(inv).map(([name, count]) => ({ name, count })) } });
   assert.match(a.etapeDuMoment(bot({})), /^collecter oak_log/);
-  assert.strictEqual(a.etapeDuMoment(bot({ stone_sword: 1, stone_pickaxe: 1, iron_ingot: 1, stick: 4, crafting_table: 1 })), 'collecter iron_ore (1), creuser vers y=16 ou chercher une grotte');
-  assert.strictEqual(a.etapeDuMoment(bot({ stone_sword: 1, stone_pickaxe: 1, iron_ingot: 2, stick: 4, crafting_table: 1 })), 'fabriquer iron_sword');
+  // Joueur5 est le mineur : pioches, 64 pierres, 16 charbons, puis la pioche en fer.
+  const stock = { stone_pickaxe: 1, cobblestone: 64, coal: 16, stick: 4, crafting_table: 1 };
+  assert.match(a.etapeDuMoment(bot({ stone_pickaxe: 1, cobblestone: 10 })), /^collecter stone/);
+  assert.strictEqual(a.etapeDuMoment(bot({ ...stock, iron_ingot: 1 })), 'collecter iron_ore (2), creuser vers y=16 ou chercher une grotte');
+  assert.strictEqual(a.etapeDuMoment(bot({ ...stock, iron_ingot: 3 })), 'fabriquer iron_pickaxe');
 });
 
 test('cabane : murs avec une porte, toit du bord vers le centre', () => {

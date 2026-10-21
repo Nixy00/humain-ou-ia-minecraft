@@ -21,11 +21,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 
 class Agent {
-  constructor({ username, persona, style, envie, objectifs, caractere, vie }, { cfg, gateway, logger }) {
+  constructor({ username, persona, style, envie, objectifs, caractere, vie, repliques, role }, { cfg, gateway, logger }) {
     this.username = username;
     this.persona = persona;
     this.objectifs = objectifs || [];
     this.vie = vie || ''; // sa vie hors du jeu, pour parler d'autre chose (une série, la météo chez lui...)
+    this.repliques = repliques || []; // exemples de son style, 4 tirés au hasard à chaque réponse
+    this.role = role || '';
     this.caractere = caractere || { serviable: 0.5, flemme: 0.5 };
     // Humeur tirée au hasard pour la partie : le même bot n'est pas toujours aussi motivé.
     this.humeur = HUMEURS[Math.floor(Math.random() * HUMEURS.length)];
@@ -313,6 +315,12 @@ class Agent {
     }, delayMs);
   }
 
+  // Objectif d'équipe (partie de test en coopération) et son rôle dedans.
+  texteEquipe() {
+    const equipe = this.cfg.agent && this.cfg.agent.equipe;
+    return equipe ? `${equipe}${this.role ? ` Ton rôle : ${this.role}.` : ''}` : '';
+  }
+
   // Champs communs à tous les outils, gardés en mémoire et journalisés (notes.jsonl).
   retenirChamps(decisionId, note, promesse) {
     // Promesse ("jfinis ma cabane et jtaide") : il la voit pendant 20 min pour y revenir plus tard.
@@ -430,7 +438,7 @@ class Agent {
         gateway: this.gateway,
         logger: this.logger,
         messages: [
-          { role: 'system', content: paroleSysteme(this.username, this.persona, this.vie, this.caractere, this.humeur) },
+          { role: 'system', content: paroleSysteme(this.username, this.persona, this.vie, this.caractere, this.humeur, this.repliques, this.texteEquipe()) },
           { role: 'user', content: parolePrompt(this.situationCourte(de), this.filConversation(), raison) },
         ],
         tools: [OUTIL_PAROLE],
@@ -528,6 +536,7 @@ class Agent {
     const t0 = Date.now();
     try {
       this.memory.etape = this.recettes ? this.etapeDuMoment(bot) : null;
+      this.memory.equipe = this.texteEquipe();
       // Il ne voit pas les demandes du chat : la parole y a déjà répondu (et s'est engagée ou non).
       const observation = observe(bot, this.mcData, { ...this.memory, demandes: [] });
       const enCours = this.actionEnCours ? `${this.actionEnCours} (depuis ${Math.round((Date.now() - this.debutAction) / 1000)} s)` : null;
