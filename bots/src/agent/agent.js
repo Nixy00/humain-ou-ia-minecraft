@@ -255,6 +255,13 @@ class Agent {
     }
   }
 
+  // Pas deux fois la même demande en 2 minutes : il attend la réponse au lieu de relancer tout le monde.
+  verifierDemande(name) {
+    const d = this.memory.demandeEnvoyee;
+    return name === 'demander' && d && Date.now() - d.t < 2 * 60000
+      ? [`tu as déjà demandé "${d.quoi}" il y a ${Math.round((Date.now() - d.t) / 1000)} s : attends la réponse et fais autre chose`] : [];
+  }
+
   // Pas de combat contre un joueur sans raison : seulement s'il m'a frappé (2 dernières minutes)
   // ou si un duel a été proposé dans le chat. Un bot qui tape les humains au hasard gâcherait l'expérience.
   verifierCombat(name, args) {
@@ -549,7 +556,7 @@ class Agent {
         ],
         tools: outilsUtiles(bot),
         meta: { agent: this.username, decisionId, kind: 'decision' },
-        extraCheck: (name, args) => [...checkArgs(bot, name, args), ...this.verifierEchecs(name, args), ...this.verifierCombat(name, args)],
+        extraCheck: (name, args) => [...checkArgs(bot, name, args), ...this.verifierEchecs(name, args), ...this.verifierCombat(name, args), ...this.verifierDemande(name)],
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
       });
       const llmMs = Date.now() - t0;
@@ -565,6 +572,14 @@ class Agent {
         tool: choice.name, args, pensee: pensee ?? null, en_cours: this.actionEnCours, llm_call_ids: choice.callIds, llm_ms: llmMs,
       });
       this.log(`${choice.name} ${JSON.stringify(args)}${pensee ? ` [pense : ${pensee}]` : ''}`);
+      // Demander : c'est la parole qui formule la demande dans le chat (le cerveau des actions ne parle pas).
+      // En attendant la réponse, il continue autre chose (un joueur ne reste pas planté à attendre).
+      if (choice.name === 'demander') {
+        this.memory.demandeEnvoyee = { quoi: args.quoi, t: Date.now() };
+        this.parler(`tu as besoin de : ${args.quoi}. Demande-le dans le chat à quelqu'un qui peut t'aider (quoi, combien, où le donner)`);
+        this.pendingReason = `tu viens de demander dans le chat : ${args.quoi}. En attendant la réponse, fais autre chose`;
+        return;
+      }
       // Une nouvelle action remplace celle en cours : on arrête proprement l'ancienne.
       if (this.actionEnCours) {
         this.numeroAction++; // l'ancienne action ne réveillera pas le cerveau en finissant
@@ -655,6 +670,7 @@ class Agent {
       const reste = bot.chantier ? bot.chantier.restants.length : NB_BLOCS;
       const pierre = inv.filter((i) => i.name === 'cobblestone').reduce((s, i) => s + i.count, 0);
       const planches = reste - pierre;
+      if (planches > 0 && this.texteEquipe()) return `demander (${planches} pierres ou planches pour la maison) ou ${prochaineEtape('oak_planks', inv, this.recettes, planches)}`;
       return (planches > 0 && prochaineEtape('oak_planks', inv, this.recettes, planches)) || 'construire (ta cabane)';
     }
     return prochaineEtape(but.objet, inv, this.recettes, but.nombre);

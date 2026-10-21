@@ -785,3 +785,12 @@ test('fermier : graines, puis semer, puis barrieres pour l enclos', async () => 
   assert.match(a.etapeDuMoment(bot({ wooden_hoe: 1, wheat_seeds: 8 })), /^semer/);
   assert.match(a.etapeDuMoment(bot({ wooden_hoe: 1 }, { fermeFaite: true })), /^collecter oak_log/); // bois pour les barrières
 });
+
+test('demander : la parole formule la demande, pas deux fois la meme en 2 minutes', async () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur6', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  assert.deepStrictEqual(a.verifierDemande('demander'), []);
+  a.memory.demandeEnvoyee = { quoi: '20 pierres pour la maison', t: Date.now() - 30000 };
+  assert.match(a.verifierDemande('demander')[0], /déjà demandé/);
+  assert.deepStrictEqual(a.verifierDemande('collecter'), []);
+});
