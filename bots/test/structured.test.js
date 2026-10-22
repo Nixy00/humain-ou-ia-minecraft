@@ -794,3 +794,36 @@ test('demander : la parole formule la demande, pas deux fois la meme en 2 minute
   assert.match(a.verifierDemande('demander')[0], /déjà demandé/);
   assert.deepStrictEqual(a.verifierDemande('collecter'), []);
 });
+
+test('donner et collecter : refuses sans l objet ou sans le bon outil', () => {
+  const { checkArgs } = require('../src/agent/actions');
+  const registry = require('minecraft-data')('1.20.4');
+  const bot = { username: 'Joueur5', registry, players: {}, game: { gameMode: 'survival' }, inventory: { items: () => [{ name: 'stick', type: registry.itemsByName.stick.id }] } };
+  assert.match(checkArgs(bot, 'donner', { joueur: 'X', objet: 'cobblestone', quantite: 3 }).join(), /pas de cobblestone/);
+  assert.match(checkArgs(bot, 'collecter', { bloc: 'stone' }).join(), /outil/);
+  assert.strictEqual(checkArgs(bot, 'collecter', { bloc: 'oak_log' }).length, 0);
+  bot.inventory.items = () => [{ name: 'wooden_pickaxe', type: registry.itemsByName.wooden_pickaxe.id }];
+  assert.strictEqual(checkArgs(bot, 'collecter', { bloc: 'stone' }).length, 0);
+  assert.match(checkArgs(bot, 'collecter', { bloc: 'iron_ore' }).join(), /outil/);
+});
+
+test('structure : pave creux, porte creusee par un pave air, couches du bas vers le haut', () => {
+  const { plansStructure } = require('../src/agent/construction');
+  const { Vec3 } = require('vec3');
+  const blocs = plansStructure(new Vec3(10, 64, 10), [
+    { bloc: 'stone', de: [0, 0, 0], a: [4, 2, 4], creux: true },
+    { bloc: 'air', de: [2, 0, 0], a: [2, 1, 0] },
+  ]);
+  assert.strictEqual(blocs.length, 75 - 9 - 2); // boîte 5x3x5 sans l'intérieur 3x1x3, moins la porte
+  assert.ok(blocs.every((b, i) => i === 0 || blocs[i - 1].pos.y <= b.pos.y));
+  assert.ok(!blocs.some((b) => b.pos.x === 12 && b.pos.z === 10 && b.pos.y < 66));
+  assert.throws(() => plansStructure(new Vec3(0, 0, 0), [{ bloc: 'stone', de: [0, 0, 0], a: [30, 30, 30] }]), /trop grande/);
+});
+
+test('scenario de test : blocs et actions interdits', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Joueur5', persona: '', interdits: ['_log'], outilsInterdits: ['creuser'] }, { cfg: {}, gateway: {}, logger: {} });
+  assert.match(a.verifierInterdits('collecter', { bloc: 'oak_log' })[0], /pas le droit/);
+  assert.deepStrictEqual(a.verifierInterdits('collecter', { bloc: 'stone' }), []);
+  assert.match(a.verifierInterdits('creuser', {})[0], /pas le droit/);
+});

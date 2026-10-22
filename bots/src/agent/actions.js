@@ -10,7 +10,7 @@ const { goals, Movements } = require('mineflayer-pathfinder');
 const { Vec3 } = require('vec3');
 const { isHostile, ANIMAUX } = require('./perception');
 const { frapper, delaiEntreCoups } = require('./humanizer');
-const { plansCabane, trouverTerrain, choisirBloc, vide } = require('./construction');
+const { plansCabane, trouverTerrain, choisirBloc, vide, plansStructure, sauverStructure, chargerStructure } = require('./construction');
 const { NOURRITURE_ANIMAL, plansEnclos, dansEnclos, bleMur, terreASemer } = require('./ferme');
 
 // Champs communs. Leurs explications sont dans la consigne système (prompt.js) et pas ici :
@@ -64,6 +64,10 @@ const TOOLS = [
   tool('attirer', "Attirer un animal dans ton enclos en tenant sa nourriture (cow et sheep : wheat, pig : carrot, chicken : wheat_seeds).", { animal: { type: 'string', enum: ['cow', 'sheep', 'pig', 'chicken'] } }, ['animal']),
   tool('reproduire', 'Donner à manger à deux animaux pour qu\'un petit naisse.', { animal: { type: 'string', enum: ['cow', 'sheep', 'pig', 'chicken'] } }, ['animal']),
   tool('construire', 'Construire une cabane de 5x5 près de toi (environ 70 blocs : cobblestone ou planches). Relance-la pour continuer le chantier.', {}),
+  tool('construire_plan', "Construire une structure que tu inventes (maison, tour...), en pavés de blocs. Coordonnées relatives à toi : x et z de 0 à 30 (est et sud), y = 0 au sol. Les pavés sont posés dans l'ordre, creux = seulement les faces (murs d'une pièce), un pavé air placé après creuse une porte ou des fenêtres. Le plan est gardé : pour refaire une structure déjà faite, donne juste son nom. Relance avec le même nom pour continuer le chantier.", {
+    nom: { type: 'string', maxLength: 40 },
+    paves: { type: 'array', items: { type: 'object', properties: { bloc: ID_MC, de: { type: 'array', items: COORD }, a: { type: 'array', items: COORD }, creux: { type: 'boolean' } }, required: ['bloc', 'de', 'a'] } },
+  }, ['nom']),
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -124,6 +128,15 @@ function checkArgs(bot, name, args) {
   // Un joueur n'écrit pas "oak_log" dans le chat : on refuse et le modèle reformule.
   if (typeof texte === 'string' && /[a-z]+_[a-z]+/i.test(texte)) {
     errors.push('écris comme un joueur, sans identifiant avec "_" (ex. oak_log -> bois)');
+  }
+  // Test en équipe du 22/10 : 37 dons ratés, la bâtisseuse promettait des objets qu'elle n'avait pas.
+  if (name === 'donner' && args.objet && bot.registry && bot.inventory && !bot.inventory.items().some((i) => i.name === nomObjet(bot, args.objet))) {
+    errors.push(`tu n'as pas de ${args.objet} : tu ne peux pas le donner, dis-le plutôt dans le chat`);
+  }
+  // Même test : le mineur, mort, a voulu miner 24 fois de la pierre sans pioche.
+  const bloc = name === 'collecter' && args.bloc && bot.registry && bot.registry.blocksByName[nomObjet(bot, args.bloc)];
+  if (bloc && bloc.harvestTools && !(bot.game && bot.game.gameMode === 'creative') && !bot.inventory.items().some((i) => bloc.harvestTools[i.type])) {
+    errors.push(`il te faut un outil pour miner ${args.bloc} (une pioche au moins en bois) : fabrique-le d'abord`);
   }
   if ('x' in args && bot.entity && bot.entity.position.distanceTo(new Vec3(args.x, args.y, args.z)) > 64) {
     errors.push('ces coordonnées sont trop loin de toi (plus de 64 blocs)');
@@ -494,6 +507,45 @@ const executors = {
       return `cabane finie en ${o.x} ${o.z} (${poses} blocs posés cette fois)`;
     }
     return `cabane en ${o.x} ${o.z} : ${poses} blocs posés, encore ${c.restants.length} (relance construire)`;
+  },
+
+  async construire_plan(bot, { nom, paves }) {
+    const c0 = bot.chantierPlan;
+    if (!c0 || c0.nom !== nom || (paves && paves.length)) {
+      const plan = paves && paves.length ? paves : chargerStructure(nom);
+      if (!plan) throw new Error(`aucune structure "${nom}" enregistrée : donne ses pavés`);
+      const origine = bot.entity.position.floored().offset(2, 0, 2);
+      const restants = plansStructure(origine, plan);
+      const inconnus = [...new Set(restants.map((r) => r.bloc))].filter((n) => !bot.registry.itemsByName[nomObjet(bot, n)]);
+      if (inconnus.length) throw new Error(`blocs inconnus : ${inconnus.join(', ')} (identifiants Minecraft anglais, ex. oak_planks)`);
+      bot.chantierPlan = { nom, origine, restants };
+      if (paves && paves.length) sauverStructure(nom, paves, bot.username);
+    }
+    const c = bot.chantierPlan;
+    const creatif = bot.game.gameMode === 'creative';
+    let poses = 0;
+    const fin = Date.now() + 45000; // on rend la main avant la limite de 60 s d'une action
+    while (c.restants.length > 0 && Date.now() < fin && !bot.interrompre) {
+      const b = c.restants[0];
+      c.restants.shift();
+      if (!vide(bot, b.pos)) continue;
+      const bloc = nomObjet(bot, b.bloc);
+      if (!creatif && !bot.inventory.items().some((i) => i.name === bloc)) throw new Error(`il te manque du ${b.bloc}, encore ${c.restants.length + 1} blocs à poser`);
+      try {
+        // En créatif, il vole au-dessus du bloc à poser (les couches du dessus ne sont pas encore posées).
+        if (creatif && bot.entity.position.distanceTo(b.pos) > 4) await bot.creative.flyTo(b.pos.offset(0.5, 2, 0.5));
+        await mindcraft(bot, 'placeBlock', bloc, b.pos.x, b.pos.y, b.pos.z);
+        poses++;
+      } catch {
+        b.essais = (b.essais || 0) + 1;
+        if (b.essais < 3) c.restants.push(b);
+      }
+    }
+    if (creatif) bot.creative.stopFlying(); // sinon il reste en l'air pour l'action suivante
+    const o = c.origine;
+    if (c.restants.length > 0) return `${nom} en ${o.x} ${o.z} : ${poses} blocs posés, encore ${c.restants.length} (relance construire_plan avec le même nom)`;
+    bot.chantierPlan = null;
+    return `${nom} fini en ${o.x} ${o.z} (${poses} blocs posés cette fois)`;
   },
 
   // Le geste du joueur : regarder ses pieds, sauter et poser un bloc dessous au sommet du saut.

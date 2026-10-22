@@ -78,5 +78,7 @@ module.exports = {
     mission: env('AGENT_MISSION', ''),
     // Objectif d'équipe pour une partie de test en coopération (vide = chacun joue pour soi).
     equipe: env('AGENT_EQUIPE', ''),
+    // Scénario de test (fichier JSON, ex. tests/chaine.json) : objectif d'équipe, mission et interdits de chaque bot.
+    test: env('AGENT_TEST', ''),
   },
 };

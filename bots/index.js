@@ -6,6 +6,7 @@
 // Plusieurs agents sans humains = mode de parties automatiques (tests).
 
 const fs = require('fs');
+const path = require('path');
 const cfg = require('./src/config');
 const { Gateway } = require('./src/llm/gateway');
 const { JsonlLogger } = require('./src/observability/logger');
@@ -13,6 +14,12 @@ const { Agent } = require('./src/agent/agent');
 const { uniform } = require('./src/agent/humanizer');
 
 const profiles = JSON.parse(fs.readFileSync(cfg.game.agentsFile, 'utf8'));
+// Scénario de test : il remplace l'objectif d'équipe et complète chaque profil (mission, objectifs, interdits).
+if (cfg.agent.test) {
+  const test = JSON.parse(fs.readFileSync(path.resolve(__dirname, cfg.agent.test), 'utf8'));
+  cfg.agent.equipe = test.equipe || '';
+  profiles.forEach((p) => Object.assign(p, test.bots[p.username]));
+}
 const only = process.argv.slice(2);
 const selected = only.length ? profiles.filter((p) => only.includes(p.username)) : profiles;
 if (selected.length === 0) {

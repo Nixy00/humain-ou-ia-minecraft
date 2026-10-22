@@ -1,0 +1,8 @@
+{
+  "equipe": "Test de construction en mode créatif sur une map plate : vous avez tous les blocs du jeu et vous pouvez voler. Chacun construit la structure qu'on lui a demandée avec construire_plan, à au moins 15 blocs des autres.",
+  "bots": {
+    "Joueur4": { "role": "constructeur", "mission": "construire une petite maison (une pièce, une porte, des fenêtres, un toit)", "objectifs": [] },
+    "Joueur5": { "role": "constructeur", "mission": "construire une grande maison (plusieurs pièces ou un étage, une porte, des fenêtres, un toit)", "objectifs": [] },
+    "Joueur6": { "role": "constructeur", "mission": "construire une tour de guet (haute, avec une plateforme en haut)", "objectifs": [] }
+  }
+}

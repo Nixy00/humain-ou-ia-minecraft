@@ -1,5 +1,7 @@
 // Construction d'une cabane simple, calculée par le code : le modèle dit juste "construire",
 // il ne sait pas placer 70 blocs un par un avec des coordonnées (trop long et il se trompe).
+const fs = require('fs');
+const path = require('path');
 const { Vec3 } = require('vec3');
 
 const TAILLE = 5; // cabane de 5 x 5, intérieur de 3 x 3
@@ -82,4 +84,57 @@ function choisirBloc(bot, partie) {
 
 const NB_BLOCS = plansCabane(new Vec3(0, 0, 0)).length;
 
-module.exports = { plansCabane, trouverTerrain, choisirBloc, vide, NB_BLOCS };
+// Structure inventée par le modèle : une liste de pavés { bloc, de: [x, y, z], a: [x, y, z], creux }.
+// Les pavés sont appliqués dans l'ordre : un pavé "air" plus loin creuse une porte ou des fenêtres.
+// Renvoie les blocs à poser, couche par couche, et du bord vers le centre dans chaque couche (comme le toit de la cabane).
+const MAX_BLOCS = 800;
+function plansStructure(origine, paves) {
+  const cases = new Map();
+  for (const p of paves) {
+    const [x1, y1, z1] = p.de.map((v) => Math.max(0, Math.min(30, Math.round(v))));
+    const [x2, y2, z2] = p.a.map((v) => Math.max(0, Math.min(30, Math.round(v))));
+    for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+        for (let z = Math.min(z1, z2); z <= Math.max(z1, z2); z++) {
+          const bord = [x === x1 || x === x2, y === y1 || y === y2, z === z1 || z === z2].filter(Boolean).length;
+          if (p.creux && bord === 0) continue; // creux : seulement les faces du pavé
+          cases.set(`${x},${y},${z}`, { x, y, z, bloc: p.bloc });
+        }
+      }
+    }
+  }
+  const blocs = [...cases.values()].filter((c) => c.bloc !== 'air');
+  if (blocs.length > MAX_BLOCS) throw new Error(`structure trop grande (${blocs.length} blocs, ${MAX_BLOCS} au plus)`);
+  const cx = blocs.reduce((s, c) => s + c.x, 0) / (blocs.length || 1);
+  const cz = blocs.reduce((s, c) => s + c.z, 0) / (blocs.length || 1);
+  const loin = (c) => Math.max(Math.abs(c.x - cx), Math.abs(c.z - cz));
+  blocs.sort((a, b) => a.y - b.y || loin(b) - loin(a));
+  return blocs.map((c) => ({ pos: origine.offset(c.x, c.y, c.z), bloc: c.bloc }));
+}
+
+// Bibliothèque de structures : chaque plan construit est gardé dans un fichier, pour le refaire plus tard.
+const DOSSIER = path.join(__dirname, '..', '..', 'structures');
+const nomFichier = (nom) => path.join(DOSSIER, `${String(nom).toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`);
+
+function sauverStructure(nom, paves, auteur) {
+  fs.mkdirSync(DOSSIER, { recursive: true });
+  fs.writeFileSync(nomFichier(nom), JSON.stringify({ nom, auteur, date: new Date().toISOString(), paves }, null, 1));
+}
+
+function chargerStructure(nom) {
+  try {
+    return JSON.parse(fs.readFileSync(nomFichier(nom), 'utf8')).paves;
+  } catch {
+    return null;
+  }
+}
+
+function listeStructures() {
+  try {
+    return fs.readdirSync(DOSSIER).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5));
+  } catch {
+    return [];
+  }
+}
+
+module.exports = { plansCabane, trouverTerrain, choisirBloc, vide, NB_BLOCS, plansStructure, sauverStructure, chargerStructure, listeStructures };

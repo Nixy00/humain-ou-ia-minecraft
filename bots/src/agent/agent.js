@@ -21,13 +21,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 
 class Agent {
-  constructor({ username, persona, style, envie, objectifs, caractere, vie, repliques, role }, { cfg, gateway, logger }) {
+  constructor({ username, persona, style, envie, objectifs, caractere, vie, repliques, role, mission, interdits, outilsInterdits }, { cfg, gateway, logger }) {
     this.username = username;
     this.persona = persona;
     this.objectifs = objectifs || [];
     this.vie = vie || ''; // sa vie hors du jeu, pour parler d'autre chose (une série, la météo chez lui...)
     this.repliques = repliques || []; // exemples de son style, 4 tirés au hasard à chaque réponse
     this.role = role || '';
+    // Règles d'un scénario de test (AGENT_TEST) : blocs qu'il n'a pas le droit de récolter, actions interdites.
+    this.interdits = interdits || [];
+    this.outilsInterdits = outilsInterdits || [];
     this.caractere = caractere || { serviable: 0.5, flemme: 0.5 };
     // Humeur tirée au hasard pour la partie : le même bot n'est pas toujours aussi motivé.
     this.humeur = HUMEURS[Math.floor(Math.random() * HUMEURS.length)];
@@ -36,7 +39,7 @@ class Agent {
     this.cfg = cfg;
     this.gateway = gateway;
     this.logger = logger;
-    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], promesses: [], historique: [], avis: {}, reflexion: null, objectifPerso: null, envie: envie || '', mission: cfg.agent ? cfg.agent.mission : '' };
+    this.memory = { events: [], chat: [], actions: [], notes: [], demandes: [], promesses: [], historique: [], avis: {}, reflexion: null, objectifPerso: null, envie: envie || '', mission: mission || (cfg.agent ? cfg.agent.mission : '') };
     this.seq = 0;
     this.pense = false; // le cerveau est en train de décider
     this.numeroAction = 0; // pour savoir si l'action qui finit a été remplacée par une autre
@@ -253,6 +256,14 @@ class Agent {
         if (Math.random() < this.style.bavard) this.entendre(`${p.username} arrive près de toi (${Math.round(d)} blocs)`, p.username);
       }
     }
+  }
+
+  // Scénario de test : chacun ne fait que son étape, le reste il doit le demander aux autres.
+  verifierInterdits(name, args) {
+    if (this.outilsInterdits.includes(name)) return [`dans ce test tu n'as pas le droit de faire ${name} : demande-le à un autre joueur`];
+    const bloc = name === 'collecter' && String(args.bloc || '');
+    return bloc && this.interdits.some((i) => bloc.includes(i))
+      ? [`dans ce test tu n'as pas le droit de récolter ${bloc} : demande-le dans le chat au joueur dont c'est le rôle`] : [];
   }
 
   // Pas deux fois la même demande en 2 minutes : il attend la réponse au lieu de relancer tout le monde.
@@ -556,7 +567,7 @@ class Agent {
         ],
         tools: outilsUtiles(bot),
         meta: { agent: this.username, decisionId, kind: 'decision' },
-        extraCheck: (name, args) => [...checkArgs(bot, name, args), ...this.verifierEchecs(name, args), ...this.verifierCombat(name, args), ...this.verifierDemande(name)],
+        extraCheck: (name, args) => [...checkArgs(bot, name, args), ...this.verifierEchecs(name, args), ...this.verifierCombat(name, args), ...this.verifierDemande(name), ...this.verifierInterdits(name, args)],
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
       });
       const llmMs = Date.now() - t0;

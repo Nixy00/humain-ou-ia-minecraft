@@ -1,0 +1,24 @@
+{
+  "equipe": "Test de la chaîne d'entraide : Joueur4 fournit le bois, Joueur5 va jusqu'au fer, Joueur6 va jusqu'aux diamants. Personne ne fait tout seul : chacun ne fait que son étape et demande le reste dans le chat. À la fin, Joueur6 donne un diamant à chacun.",
+  "bots": {
+    "Joueur4": {
+      "role": "bûcheron",
+      "mission": "tu t'occupes seulement du bois : coupe des bûches, fais des planches ou des bâtons si on te le demande, et donne-les à Joueur5 et Joueur6 dès qu'ils en ont besoin",
+      "objectifs": [{ "objet": "oak_log", "nombre": 16 }],
+      "interdits": ["stone", "_ore", "deepslate", "dirt", "gravel", "sand"],
+      "outilsInterdits": ["creuser"]
+    },
+    "Joueur5": {
+      "role": "mineur du fer",
+      "mission": "tu n'as pas le droit de couper du bois, demande-le à Joueur4. Avec son bois fais tes outils en bois, puis pierre et pioche en pierre, puis fer fondu au four, puis pioche, épée et armure complète en fer. Ensuite donne une pioche en fer (ou 3 lingots de fer) à Joueur6",
+      "objectifs": ["wooden_pickaxe", "stone_pickaxe", "iron_pickaxe", "iron_sword", "iron_helmet", "iron_chestplate", "iron_leggings", "iron_boots"],
+      "interdits": ["_log", "diamond"]
+    },
+    "Joueur6": {
+      "role": "mineur de diamants",
+      "mission": "tu n'as pas le droit de couper du bois ni de miner du fer : demande une pioche en fer (ou 3 lingots) à Joueur5 et du bois à Joueur4. Ensuite creuse jusqu'aux diamants (vers y = -58), récupère-en au moins 3 et donne un diamant à Joueur4 et un à Joueur5",
+      "objectifs": [{ "objet": "diamond", "nombre": 3 }],
+      "interdits": ["_log", "iron_ore", "coal_ore"]
+    }
+  }
+}

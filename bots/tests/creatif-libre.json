@@ -1,0 +1,8 @@
+{
+  "equipe": "Test en mode créatif sur une map plate : vous avez tous les blocs du jeu et vous pouvez voler. Construisez ce que vous voulez (construire_plan), seul ou à plusieurs, et parlez-en entre vous.",
+  "bots": {
+    "Joueur4": { "role": "libre", "mission": "construire ce qui te plaît", "objectifs": [] },
+    "Joueur5": { "role": "libre", "mission": "construire ce qui te plaît", "objectifs": [] },
+    "Joueur6": { "role": "libre", "mission": "construire ce qui te plaît", "objectifs": [] }
+  }
+}
