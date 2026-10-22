@@ -114,7 +114,7 @@ function plansStructure(origine, paves) {
 
 // Bibliothèque de structures : chaque plan construit est gardé dans un fichier, pour le refaire plus tard.
 const DOSSIER = path.join(__dirname, '..', '..', 'structures');
-const nomFichier = (nom) => path.join(DOSSIER, `${String(nom).toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`);
+const nomFichier = (nom) => path.join(DOSSIER, `${String(nom).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_')}.json`);
 
 function sauverStructure(nom, paves, auteur) {
   fs.mkdirSync(DOSSIER, { recursive: true });

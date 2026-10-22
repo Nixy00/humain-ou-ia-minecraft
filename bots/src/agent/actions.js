@@ -510,6 +510,9 @@ const executors = {
   },
 
   async construire_plan(bot, { nom, paves }) {
+    // Test du 22/10 : Joueur5 relançait sans fin la même structure finie, à chaque fois un peu plus loin.
+    bot.structuresFinies = bot.structuresFinies || [];
+    if (bot.structuresFinies.includes(nom) && !(paves && paves.length)) throw new Error(`tu as déjà fini ${nom} : fais autre chose`);
     const c0 = bot.chantierPlan;
     if (!c0 || c0.nom !== nom || (paves && paves.length)) {
       const plan = paves && paves.length ? paves : chargerStructure(nom);
@@ -524,7 +527,7 @@ const executors = {
     const c = bot.chantierPlan;
     const creatif = bot.game.gameMode === 'creative';
     let poses = 0;
-    const fin = Date.now() + 45000; // on rend la main avant la limite de 60 s d'une action
+    const fin = Date.now() + 40000; // on rend la main avant la limite de 60 s d'une action (8 s au plus par bloc)
     while (c.restants.length > 0 && Date.now() < fin && !bot.interrompre) {
       const b = c.restants[0];
       c.restants.shift();
@@ -534,9 +537,11 @@ const executors = {
       try {
         // En créatif, il vole au-dessus du bloc à poser (les couches du dessus ne sont pas encore posées).
         if (creatif && bot.entity.position.distanceTo(b.pos) > 4) await bot.creative.flyTo(b.pos.offset(0.5, 2, 0.5));
-        await mindcraft(bot, 'placeBlock', bloc, b.pos.x, b.pos.y, b.pos.z);
+        // Un bloc qui bloque (chemin introuvable) ne doit pas faire couper toute l'action à 60 s.
+        await Promise.race([mindcraft(bot, 'placeBlock', bloc, b.pos.x, b.pos.y, b.pos.z), sleep(8000).then(() => { throw new Error('trop long'); })]);
         poses++;
       } catch {
+        bot.pathfinder.stop();
         b.essais = (b.essais || 0) + 1;
         if (b.essais < 3) c.restants.push(b);
         else c.rates = (c.rates || 0) + 1;
@@ -546,6 +551,7 @@ const executors = {
     const o = c.origine;
     if (c.restants.length > 0) return `${nom} en ${o.x} ${o.z} : ${poses} blocs posés, encore ${c.restants.length} (relance construire_plan avec le même nom)`;
     bot.chantierPlan = null;
+    bot.structuresFinies.push(nom);
     if (c.rates) return `${nom} terminé en ${o.x} ${o.z}, mais ${c.rates} blocs n'ont pas pu être posés`;
     return `${nom} fini en ${o.x} ${o.z} (${poses} blocs posés cette fois)`;
   },

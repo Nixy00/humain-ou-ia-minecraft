@@ -449,7 +449,7 @@ test('demandes : le bot voit la demande ET son etape, ses promesses, et choisit 
   const { Vec3 } = require('vec3');
   const memory = { events: [], chat: [], actions: [], notes: [], demandes: [{ from: 'SAHYGO', text: 'on remonte', t: Date.now() }], objectif: null, etape: 'collecter diamond_ore (5)' };
   const bot = { username: 'Joueur4', entity: { position: new Vec3(0, -50, 0) }, players: {}, entities: {}, health: 20, food: 20,
-    inventory: { items: () => [] }, findBlocks: () => [], time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
+    inventory: { items: () => [] }, findBlocks: () => [], blockAt: () => ({ skyLight: 0 }), time: { timeOfDay: 1000 }, registry: { foodsByName: {} } };
   const texte = observe(bot, { blocksArray: [] }, memory);
   assert.ok(texte.includes('Prochaine étape'));
   assert.ok(texte.includes('on remonte'));
@@ -826,4 +826,12 @@ test('scenario de test : blocs et actions interdits', () => {
   assert.match(a.verifierInterdits('collecter', { bloc: 'oak_log' })[0], /pas le droit/);
   assert.deepStrictEqual(a.verifierInterdits('collecter', { bloc: 'stone' }), []);
   assert.match(a.verifierInterdits('creuser', {})[0], /pas le droit/);
+});
+
+test('sous terre : selon la lumiere du ciel, pas selon la hauteur', () => {
+  const { sousTerre } = require('../src/agent/perception');
+  const { Vec3 } = require('vec3');
+  const bot = (lumiere) => ({ entity: { position: new Vec3(0, -60, 0) }, blockAt: () => ({ skyLight: lumiere }) });
+  assert.strictEqual(sousTerre(bot(15)), false); // map plate, en plein air à y = -60
+  assert.strictEqual(sousTerre(bot(0)), true);
 });

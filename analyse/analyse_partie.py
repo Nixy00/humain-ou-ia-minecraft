@@ -45,7 +45,7 @@ def resumer(dossier):
             "tokens_question": sum(a["usage"]["prompt_tokens"] for a in ses_appels),
             "tokens_reponse": sum(a["usage"]["completion_tokens"] for a in ses_appels),
             "latence_mediane_ms": mediane([a["latency_ms"] for a in ses_appels]),
-            "declencheurs": dict(Counter(d["reason"].split(" (")[0] for d in decisions if d.get("agent") == agent)),
+            "declencheurs": dict(Counter(d.get("reason", "?").split(" (")[0] for d in decisions if d.get("agent") == agent)),
             "actions_reussies": dict(Counter(a["tool"] for a in ses_actions if a.get("ok"))),
             "actions_ratees": dict(Counter(a["tool"] for a in ses_actions if not a.get("ok"))),
             "messages": len(messages),

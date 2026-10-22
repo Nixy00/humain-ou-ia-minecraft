@@ -14,6 +14,12 @@ function round(n) {
   return Math.round(n);
 }
 
+// Sous terre = le ciel ne l'éclaire plus. Avant on regardait y < 50, faux sur une map plate (sol à y = -60).
+function sousTerre(bot) {
+  const b = bot.blockAt && bot.blockAt(bot.entity.position.offset(0, 1, 0));
+  return Boolean(b) && b.skyLight < 8;
+}
+
 function agoText(t) {
   const s = Math.round((Date.now() - t) / 1000);
   return s < 60 ? `il y a ${s} s` : `il y a ${Math.round(s / 60)} min`;
@@ -86,7 +92,7 @@ function observe(bot, mcData, memory) {
   const moment = tod < 12300 || tod > 23850 ? 'jour' : 'nuit';
 
   const lines = [
-    `Toi : ${bot.username}. Vie ${round(bot.health)}/20, faim ${round(bot.food)}/20. Position x=${round(me.x)} y=${round(me.y)} z=${round(me.z)}${me.y < 50 ? ' (sous terre, loin de la surface)' : ''}. Il fait ${moment}.`,
+    `Toi : ${bot.username}. Vie ${round(bot.health)}/20, faim ${round(bot.food)}/20. Position x=${round(me.x)} y=${round(me.y)} z=${round(me.z)}${sousTerre(bot) ? ' (sous terre, loin de la surface)' : ''}. Il fait ${moment}.`,
     `Inventaire : ${inventorySummary(bot)}.`,
     `Joueurs connectés : ${others.map((p) => p.username).join(', ') || 'aucun'}.`,
     `Joueurs visibles : ${visible.join(', ') || 'aucun'}.`,
@@ -213,4 +219,4 @@ function observe(bot, mcData, memory) {
   return lines.join('\n');
 }
 
-module.exports = { observe, isHostile, ANIMAUX };
+module.exports = { observe, isHostile, ANIMAUX, sousTerre };
