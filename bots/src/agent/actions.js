@@ -539,12 +539,14 @@ const executors = {
       } catch {
         b.essais = (b.essais || 0) + 1;
         if (b.essais < 3) c.restants.push(b);
+        else c.rates = (c.rates || 0) + 1;
       }
     }
     if (creatif) bot.creative.stopFlying(); // sinon il reste en l'air pour l'action suivante
     const o = c.origine;
     if (c.restants.length > 0) return `${nom} en ${o.x} ${o.z} : ${poses} blocs posés, encore ${c.restants.length} (relance construire_plan avec le même nom)`;
     bot.chantierPlan = null;
+    if (c.rates) return `${nom} terminé en ${o.x} ${o.z}, mais ${c.rates} blocs n'ont pas pu être posés`;
     return `${nom} fini en ${o.x} ${o.z} (${poses} blocs posés cette fois)`;
   },
 
