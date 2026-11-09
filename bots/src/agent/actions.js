@@ -57,7 +57,7 @@ const TOOLS = [
   tool('creuser', 'Creuser droit vers le bas (pour descendre vers les minerais : fer vers y=16, diamant vers y=-58).', { blocs: { type: 'integer', minimum: 1, maximum: 20 } }, ['blocs']),
   tool('remonter', 'Remonter à la surface.', {}),
   tool('monter', 'Monter sur place en posant des blocs sous tes pieds (sauter + poser), pour sortir d\'un trou ou atteindre un endroit en hauteur.', { blocs: { type: 'integer', minimum: 1, maximum: 10 } }, ['blocs']),
-  tool('demander', "Demander un objet ou de l'aide aux autres joueurs dans le chat. quoi = ce que tu veux en clair (quoi, combien, où le donner).", { quoi: { type: 'string', minLength: 1, maxLength: 120 } }, ['quoi']),
+  tool('demander', "Demander un objet ou de l'aide aux autres joueurs dans le chat. quoi = ce que tu veux, dit simplement.", { quoi: { type: 'string', minLength: 1, maxLength: 120 } }, ['quoi']),
   tool('semer', 'Labourer la terre près de toi avec une houe et planter des graines de blé (wheat_seeds).', { nombre: { type: 'integer', minimum: 1, maximum: 9 } }, ['nombre']),
   tool('recolter', 'Récolter le blé mûr de ta ferme et le replanter.', {}),
   tool('enclos', "Construire un enclos de 5x5 (15 barrières et 1 portillon) près de toi. Relance-le pour continuer le chantier.", {}),

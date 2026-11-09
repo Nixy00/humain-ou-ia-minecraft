@@ -126,7 +126,7 @@ class Agent {
       // pendant un test, "bande de fou allez me chercher..." et "vous pouvez parler ???" n'ont eu aucune réponse.
       // "joueur 4" (avec un espace) = "Joueur4" : avant, "je suis avec toi joueur 4" n'était pas compris comme pour lui.
       const nomme = estCite(text, [this.username, ...this.surnoms]);
-      const pourTous = !seulsTousLesDeux && !nomme && /(vous|tout le monde|qq1|qqun|quelqu'un|quelquun|personne|les gars)/i.test(text);
+      const pourTous = !seulsTousLesDeux && !nomme && /b(vous|tout le monde|qq1|qqun|quelqu'un|quelquun|personne|les gars)b/i.test(text);
       const pourMoi = seulsTousLesDeux || nomme || pourTous;
       // Un vrai joueur cité ne répond que 2 fois sur 3 dans les 2 minutes (analyse/rythme_chat.py) :
       // occupé, il répond parfois seulement quand il a fini son action (il verra le message à ce moment-là).
@@ -286,6 +286,14 @@ class Agent {
 
   // Un joueur ne renvoie pas trois fois le même message : on refuse un message
   // qui commence comme un des 3 derniers, et le modèle doit dire autre chose.
+  // Test du 22/10 : "30 cobblestone stp ? 108 89 -56". Un joueur donne ses coordonnées quand on lui demande où il est,
+  // pas dans chaque message.
+  verifierCoordonnees(texte) {
+    const demandees = this.memory.chat.some((m) => Date.now() - m.t < 120000 && m.from !== this.username
+      && /\b(t'?es|tes|t) ?o[uù]\b|o[uù] (t'?es|tu es)|coord|position/i.test(m.text));
+    return positionAnnoncee(texte) && !demandees ? ['pas de coordonnées dans le chat si personne ne demande où tu es : dis plutôt "vers le spawn", "à la grotte"...'] : [];
+  }
+
   verifierRepetition(name, args) {
     const texte = args.dire ?? args.message;
     if (typeof texte !== 'string' || !texte.trim()) return [];
@@ -462,7 +470,7 @@ class Agent {
         ],
         tools: [OUTIL_PAROLE],
         meta: { agent: this.username, decisionId, kind: 'parole' },
-        extraCheck: (name, args) => (args.dire ? [...checkArgs(bot, 'parole', { message: args.dire }), ...this.verifierRepetition('parole', args)] : []),
+        extraCheck: (name, args) => (args.dire ? [...checkArgs(bot, 'parole', { message: args.dire }), ...this.verifierRepetition('parole', args), ...this.verifierCoordonnees(args.dire)] : []),
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
       });
       const llmMs = Date.now() - t0;
@@ -588,7 +596,7 @@ class Agent {
       // En attendant la réponse, il continue autre chose (un joueur ne reste pas planté à attendre).
       if (choice.name === 'demander') {
         this.memory.demandeEnvoyee = { quoi: args.quoi, t: Date.now() };
-        this.parler(`tu as besoin de : ${args.quoi}. Demande-le dans le chat à quelqu'un qui peut t'aider (quoi, combien, où le donner)`);
+        this.parler(`tu as besoin de : ${args.quoi}. Demande-le simplement dans le chat, comme un joueur (ex. "qqun a du bois ?"), sans coordonnées`);
         this.pendingReason = `tu viens de demander dans le chat : ${args.quoi}. En attendant la réponse, fais autre chose`;
         return;
       }

@@ -844,3 +844,12 @@ test('pseudos : on parle a un bot par son pseudo ou un surnom, en mot entier', (
   assert.ok(citeUnAutre('luna tas du bois ?', 'tomtom59', ['tomtom59', 'Lunaa_44'], { Lunaa_44: ['luna'] }));
   assert.ok(!citeUnAutre('luna tas du bois ?', 'Lunaa_44', ['tomtom59', 'Lunaa_44'], { Lunaa_44: ['luna'] }));
 });
+
+test('chat : pas de coordonnees si personne ne demande ou il est', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Kr0nos_', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  assert.match(a.verifierCoordonnees('30 cobble stp ? 108 89 -56')[0], /coordonnées/);
+  assert.deepStrictEqual(a.verifierCoordonnees('qqun a du bois ?'), []);
+  a.memory.chat.push({ from: 'tomtom59', text: 'kro tes ou ?', t: Date.now() });
+  assert.deepStrictEqual(a.verifierCoordonnees('108 -56'), []);
+});
