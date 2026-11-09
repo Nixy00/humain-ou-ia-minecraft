@@ -853,3 +853,31 @@ test('chat : pas de coordonnees si personne ne demande ou il est', () => {
   a.memory.chat.push({ from: 'tomtom59', text: 'kro tes ou ?', t: Date.now() });
   assert.deepStrictEqual(a.verifierCoordonnees('108 -56'), []);
 });
+
+test('messages spontanes : rares, jamais deux fois en 3 minutes', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'tomtom59', persona: '', style: { bavard: 1 } }, { cfg: { agent: { humanize: true } }, gateway: {}, logger: {} });
+  let paroles = 0;
+  a.entendre = () => paroles++;
+  for (let i = 0; i < 200; i++) a.commenterPeutEtre('collecter', { ok: false, result: 'raté' });
+  assert.strictEqual(paroles, 1);
+  a.dernierSpontane = Date.now() - 4 * 60000;
+  for (let i = 0; i < 200; i++) a.commenterPeutEtre('collecter', { ok: false, result: 'raté' });
+  assert.strictEqual(paroles, 2);
+});
+
+test('boucles : pas 4 fois la meme action, pas 3 attentes de suite', () => {
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Lunaa_44', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  const fait = (name, args) => a.memory.actions.push({ name, args, ok: true, result: 'ok' });
+  fait('attendre', { secondes: 10 }); fait('attendre', { secondes: 15 });
+  assert.deepStrictEqual(a.verifierEchecs('attendre', { secondes: 5 }), []);
+  fait('attendre', { secondes: 20 });
+  assert.match(a.verifierEchecs('attendre', { secondes: 5 })[0], /en boucle/);
+  a.memory.actions = [];
+  for (let i = 0; i < 4; i++) fait('collecter', { bloc: 'stone' });
+  assert.deepStrictEqual(a.verifierEchecs('collecter', { bloc: 'stone' }), []); // miner en boucle, c'est normal
+  a.memory.actions = [];
+  for (let i = 0; i < 4; i++) fait('remonter', {});
+  assert.match(a.verifierEchecs('remonter', {})[0], /en boucle/);
+});

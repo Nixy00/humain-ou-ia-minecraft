@@ -638,6 +638,7 @@ class Agent {
       });
       this.memory.actions.push({ name, args, ok: res.ok, result: res.result, t: Date.now() });
       if (this.memory.actions.length > 5) this.memory.actions.shift();
+      this.commenterPeutEtre(name, res);
       this.memory.historique.push({ name, args, ok: res.ok, result: String(res.result).slice(0, 100), t: Date.now() });
       if (this.memory.historique.length > 30) this.memory.historique.shift();
       this.log(`${name} -> ${res.result}${pensee ? ` [pense : ${pensee}]` : ''}`);
@@ -739,7 +740,24 @@ class Agent {
     if (trois.length === 3 && trois.every((a) => !a.ok && a.name === name)) {
       return [`${name} a raté 3 fois de suite (${trois[2].result.slice(0, 80)}) : change complètement d'approche`];
     }
+    // Boucles qui "réussissent" mais se voient en jeu (test du 22/10 : 17 fois attendre, 80 fois remonter) :
+    // 3 attentes de suite, ou 4 fois la même action avec les mêmes arguments (sauf celles qui avancent un travail).
+    const avancent = ['collecter', 'creuser', 'construire', 'construire_plan', 'recolter', 'semer', 'se_defendre', 'combattre', 'fuir'];
+    const dernieres = this.memory.actions.slice(-(name === 'attendre' ? 3 : 4));
+    const pareil = dernieres.length === (name === 'attendre' ? 3 : 4) && dernieres.every((a) => cle(a.name, a.args) === cle(name, args) || (name === 'attendre' && a.name === 'attendre'));
+    if (pareil && !avancent.includes(name)) return [`tu fais ${name} en boucle : un vrai joueur ferait autre chose en attendant`];
     return [];
+  }
+
+  // Un vrai joueur parle aussi sans qu'on lui parle (râler, commenter, blaguer) : au test du 22/10, presque aucun
+  // message spontané en 10 minutes. Plus souvent après une action marquante, selon son caractère, et pas plus
+  // d'une fois toutes les 3 minutes (les joueurs du jeu de données parlent par petites conversations, pas en continu).
+  commenterPeutEtre(name, res) {
+    if (!this.cfg.agent.humanize || Date.now() - (this.dernierSpontane || 0) < 3 * 60000) return;
+    const marquant = !res.ok || /diamond|iron|fini/.test(String(res.result));
+    if (Math.random() > this.style.bavard * (marquant ? 0.25 : 0.05)) return;
+    this.dernierSpontane = Date.now();
+    this.entendre(`personne ne t'a parlé. Si tu en as envie, dis un petit truc spontané comme un vrai joueur : réagir à ce qui vient de t'arriver (${name} ${res.ok ? 'réussi' : 'raté'}), râler, blaguer, ou parler d'autre chose (ta journée, ta vie). Sinon ne dis rien`);
   }
 
   // Après une décision : une demande d'un joueur en attente passe d'abord.
