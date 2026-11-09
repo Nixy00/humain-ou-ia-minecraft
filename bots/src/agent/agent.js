@@ -5,10 +5,10 @@ const mineflayer = require('mineflayer');
 const { pathfinder, Movements } = require('mineflayer-pathfinder');
 const minecraftData = require('minecraft-data');
 
-const { observe } = require('./perception');
+const { observe, isHostile } = require('./perception');
 const { execute, checkArgs, outilsUtiles, OUTIL_REFLEXION, OUTIL_PAROLE } = require('./actions');
 const { systemPrompt, turnPrompt, reflexionPrompt, votePrompt, paroleSysteme, parolePrompt } = require('./prompt');
-const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, delaiAvantAction, uniform, filtrerMessage } = require('./humanizer');
+const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, delaiAvantAction, uniform, filtrerMessage, pauseHumaine } = require('./humanizer');
 const { startReflexes } = require('./reflexes');
 const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
 const { NB_BLOCS } = require('./construction');
@@ -654,11 +654,20 @@ class Agent {
     })().catch((err) => {
       this.logger.write('errors', { agent: this.username, decision_id: decisionId, message: 'action', detail: err.stack });
       return { ok: false, result: err.message };
-    }).then((res) => {
+    }).then(async (res) => {
       if (numero !== this.numeroAction) return; // remplacée par une autre action : rien à faire
       this.actionEnCours = null;
       this.actionFin = null;
-      if (res) this.suite(`ton action ${name} vient de finir (${res.ok ? 'réussie' : 'ratée'})`);
+      if (!res) return;
+      // Petite pause après une longue action (ou de temps en temps), sauf en danger.
+      const longue = Date.now() - this.debutAction > 20000;
+      const danger = bot.health < 10 || bot.nearestEntity((e) => isHostile(e) && bot.entity.position.distanceTo(e.position) < 12);
+      if (this.cfg.agent.humanize && !danger && Math.random() < (longue ? 0.5 : 0.12)) {
+        const gestes = await pauseHumaine(bot).catch(() => []);
+        this.logger.write('events', { agent: this.username, type: 'pause', text: gestes.join(', ') });
+        if (numero !== this.numeroAction) return; // un joueur lui a parlé pendant la pause : une autre action a pris la suite
+      }
+      this.suite(`ton action ${name} vient de finir (${res.ok ? 'réussie' : 'ratée'})`);
     });
   }
 

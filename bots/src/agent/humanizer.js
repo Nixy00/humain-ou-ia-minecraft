@@ -114,5 +114,38 @@ function filtrerMessage(texte, mesDerniers) {
   return t;
 }
 
+// Pause entre deux actions, comme un joueur qui souffle : des gestes que les autres voient, sans appel au modèle.
+// Avant, le bot enchaînait une nouvelle action 1 à 3 s après la précédente, toute la partie, comme une machine.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function pauseHumaine(bot) {
+  const gestes = [];
+  const joueur = bot.nearestEntity((e) => e.type === 'player' && bot.entity.position.distanceTo(e.position) < 8);
+  if (joueur && Math.random() < 0.5) { // s'accroupir deux fois : le "salut" des joueurs
+    gestes.push('accroupi');
+    for (let i = 0; i < 2; i++) {
+      bot.setControlState('sneak', true);
+      await sleep(uniform(150, 300));
+      bot.setControlState('sneak', false);
+      await sleep(uniform(150, 300));
+    }
+  }
+  if (Math.random() < 0.4) {
+    gestes.push('objet en main');
+    bot.setQuickBarSlot(Math.floor(Math.random() * 9));
+  }
+  if (Math.random() < 0.2) {
+    gestes.push('saut');
+    bot.setControlState('jump', true);
+    await sleep(200);
+    bot.setControlState('jump', false);
+  }
+  gestes.push('regarde autour');
+  for (let i = Math.floor(uniform(1, 4)); i > 0; i--) {
+    await bot.look(bot.entity.yaw + uniform(-1.5, 1.5), uniform(-0.4, 0.3)).catch(() => {});
+    await sleep(uniform(500, 1800));
+  }
+  return gestes;
+}
+
 module.exports = {
-  filtrerMessage, STYLE_DEFAUT, uniform, gauss, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, reactionMs, delaiAvantAction, frapper, delaiEntreCoups };
+  pauseHumaine, filtrerMessage, STYLE_DEFAUT, uniform, gauss, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverAccents, reactionMs, delaiAvantAction, frapper, delaiEntreCoups };

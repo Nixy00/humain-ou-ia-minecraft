@@ -892,3 +892,21 @@ test('chat : pas de mots de programme, pas toujours le meme debut de message', (
   assert.match(a.verifierDebut('Ah ouais... enfin ma table')[0], /ah ouais/);
   assert.deepStrictEqual(a.verifierDebut('enfin ma table de craft'), []);
 });
+
+test('pause humaine : regarde autour, et salue en s accroupissant si un joueur est proche', async () => {
+  const { pauseHumaine } = require('../src/agent/humanizer');
+  const { Vec3 } = require('vec3');
+  const fait = [];
+  const bot = {
+    entity: { position: new Vec3(0, 64, 0), yaw: 0 },
+    nearestEntity: (f) => [{ type: 'player', position: new Vec3(3, 64, 0) }].find(f),
+    setControlState: (c, v) => fait.push(`${c}:${v}`),
+    setQuickBarSlot: () => fait.push('slot'),
+    look: async () => fait.push('look'),
+  };
+  const hasard = Math.random;
+  Math.random = () => 0.1; // tous les gestes, un seul regard : test rapide
+  const gestes = await pauseHumaine(bot).finally(() => { Math.random = hasard; });
+  assert.deepStrictEqual(gestes, ['accroupi', 'objet en main', 'saut', 'regarde autour']);
+  assert.ok(fait.includes('look'));
+});
