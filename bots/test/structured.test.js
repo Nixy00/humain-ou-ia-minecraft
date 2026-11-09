@@ -881,3 +881,14 @@ test('boucles : pas 4 fois la meme action, pas 3 attentes de suite', () => {
   for (let i = 0; i < 4; i++) fait('remonter', {});
   assert.match(a.verifierEchecs('remonter', {})[0], /en boucle/);
 });
+
+test('chat : pas de mots de programme, pas toujours le meme debut de message', () => {
+  const { checkArgs } = require('../src/agent/actions');
+  const bot = { username: 'tomtom59', players: {} };
+  assert.match(checkArgs(bot, 'parole', { message: 'jpp encore un timeout' }).join(), /programme/);
+  const { Agent } = require('../src/agent/agent');
+  const a = new Agent({ username: 'Lunaa_44', persona: '' }, { cfg: {}, gateway: {}, logger: {} });
+  a.memory.chat.push({ from: 'Lunaa_44', text: 'ah ouais, sympa !', t: Date.now() });
+  assert.match(a.verifierDebut('Ah ouais... enfin ma table')[0], /ah ouais/);
+  assert.deepStrictEqual(a.verifierDebut('enfin ma table de craft'), []);
+});

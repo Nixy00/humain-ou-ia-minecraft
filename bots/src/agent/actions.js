@@ -138,6 +138,10 @@ function checkArgs(bot, name, args) {
   if (bloc && bloc.harvestTools && !(bot.game && bot.game.gameMode === 'creative') && !bot.inventory.items().some((i) => bloc.harvestTools[i.type])) {
     errors.push(`il te faut un outil pour miner ${args.bloc} (une pioche au moins en bois) : fabrique-le d'abord`);
   }
+  // Partie du 09/11 : "encore un timeout pour un bout de bois". Un joueur ne parle pas comme un programme.
+  if (typeof texte === 'string' && /time ?out|interrompu|pathfind|regard(er)? joueur/i.test(texte)) {
+    errors.push("écris comme un joueur, pas avec des mots de programme (timeout, action interrompue...)");
+  }
   if ('x' in args && bot.entity && bot.entity.position.distanceTo(new Vec3(args.x, args.y, args.z)) > 64) {
     errors.push('ces coordonnées sont trop loin de toi (plus de 64 blocs)');
   }

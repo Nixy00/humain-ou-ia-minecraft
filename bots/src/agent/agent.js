@@ -294,6 +294,14 @@ class Agent {
     return positionAnnoncee(texte) && !demandees ? ['pas de coordonnées dans le chat si personne ne demande où tu es : dis plutôt "vers le spawn", "à la grotte"...'] : [];
   }
 
+  // Partie du 09/11 : 3 messages de Lunaa_44 sur 4 commençaient par "ah ouais". Un tic se voit vite.
+  verifierDebut(texte) {
+    const debut = (t) => t.toLowerCase().replace(/[^a-zàâçéèêëîïôûùü' ]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 2).join(' ');
+    const d = debut(texte);
+    const mesDerniers = this.memory.chat.filter((m) => m.from === this.username).slice(-4);
+    return d.includes(' ') && mesDerniers.some((m) => debut(m.text) === d) ? [`tu commences encore par "${d}" : varie ta façon de commencer`] : [];
+  }
+
   verifierRepetition(name, args) {
     const texte = args.dire ?? args.message;
     if (typeof texte !== 'string' || !texte.trim()) return [];
@@ -470,7 +478,7 @@ class Agent {
         ],
         tools: [OUTIL_PAROLE],
         meta: { agent: this.username, decisionId, kind: 'parole' },
-        extraCheck: (name, args) => (args.dire ? [...checkArgs(bot, 'parole', { message: args.dire }), ...this.verifierRepetition('parole', args), ...this.verifierCoordonnees(args.dire)] : []),
+        extraCheck: (name, args) => (args.dire ? [...checkArgs(bot, 'parole', { message: args.dire }), ...this.verifierRepetition('parole', args), ...this.verifierCoordonnees(args.dire), ...this.verifierDebut(args.dire)] : []),
         maxFormatRetries: this.cfg.llm.maxFormatRetries,
       });
       const llmMs = Date.now() - t0;
@@ -757,7 +765,7 @@ class Agent {
     const marquant = !res.ok || /diamond|iron|fini/.test(String(res.result));
     if (Math.random() > this.style.bavard * (marquant ? 0.25 : 0.05)) return;
     this.dernierSpontane = Date.now();
-    this.entendre(`personne ne t'a parlé. Si tu en as envie, dis un petit truc spontané comme un vrai joueur : réagir à ce qui vient de t'arriver (${name} ${res.ok ? 'réussi' : 'raté'}), râler, blaguer, ou parler d'autre chose (ta journée, ta vie). Sinon ne dis rien`);
+    this.entendre(`personne ne t'a parlé. Si tu en as envie, dis un petit truc spontané comme un vrai joueur : réagir à ce que tu viens de faire (${res.ok ? 'ça a marché' : 'ça a raté'}), râler, blaguer, ou parler d'autre chose (ta journée, ta vie). Sinon ne dis rien`);
   }
 
   // Après une décision : une demande d'un joueur en attente passe d'abord.
