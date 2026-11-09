@@ -13,48 +13,48 @@ const il = (s) => Date.now() - s * 1000; // "il y a s secondes"
 
 // Chaque situation : le bot, son inventaire, l'action en cours, le chat récent et ce qui le réveille.
 const SITUATIONS = [
-  { nom: 'on lui demande de la pierre', bot: 'Joueur4', inventaire: { cobblestone: 40, stone_pickaxe: 1 }, enCours: 'collecter',
-    chat: [['Joueur6', 'joueur4 tas de la pierre ?', 5]], raison: 'message de Joueur6 : "joueur4 tas de la pierre ?"' },
-  { nom: 'on le soupçonne d\'être un bot', bot: 'Joueur5', inventaire: { iron_sword: 1 }, enCours: 'collecter',
+  { nom: 'on lui demande de la pierre', bot: 'tomtom59', inventaire: { cobblestone: 40, stone_pickaxe: 1 }, enCours: 'collecter',
+    chat: [['Lunaa_44', 'joueur4 tas de la pierre ?', 5]], raison: 'message de Lunaa_44 : "joueur4 tas de la pierre ?"' },
+  { nom: 'on le soupçonne d\'être un bot', bot: 'Kr0nos_', inventaire: { iron_sword: 1 }, enCours: 'collecter',
     chat: [['SAHYGO', 'joueur5 tes un bot ou quoi', 4]], raison: 'message de SAHYGO : "joueur5 tes un bot ou quoi"' },
-  { nom: 'salut à tout le monde', bot: 'Joueur6', inventaire: { oak_planks: 20 }, enCours: 'construire',
+  { nom: 'salut à tout le monde', bot: 'Lunaa_44', inventaire: { oak_planks: 20 }, enCours: 'construire',
     chat: [['SAHYGO', 'yo les gars ca va ?', 3]], raison: 'message de SAHYGO à tout le monde : "yo les gars ca va ?"' },
-  { nom: 'sujet hors jeu : la meteo', bot: 'Joueur4', inventaire: { cobblestone: 12 }, enCours: 'collecter',
+  { nom: 'sujet hors jeu : la meteo', bot: 'tomtom59', inventaire: { cobblestone: 12 }, enCours: 'collecter',
     chat: [['SAHYGO', 'joueur4 il pleut chez toi ? ici cest le deluge', 4]], raison: "SAHYGO vient d'écrire : « joueur4 il pleut chez toi ? ici cest le deluge »" },
-  { nom: 'sujet hors jeu : un film', bot: 'Joueur6', inventaire: { oak_planks: 10 }, enCours: 'construire',
+  { nom: 'sujet hors jeu : un film', bot: 'Lunaa_44', inventaire: { oak_planks: 10 }, enCours: 'construire',
     chat: [['SAHYGO', 'joueur6 tas vu un film recemment ?', 4]], raison: "SAHYGO vient d'écrire : « joueur6 tas vu un film recemment ? »" },
-  { nom: "tu viens d'ou", bot: 'Joueur5', inventaire: { iron_sword: 1 }, enCours: 'collecter',
+  { nom: "tu viens d'ou", bot: 'Kr0nos_', inventaire: { iron_sword: 1 }, enCours: 'collecter',
     chat: [['SAHYGO', 'vous venez dou les gars ?', 3]], raison: 'SAHYGO a écrit à tout le monde : "vous venez dou les gars ?"' },
-  { nom: 'question à tout le monde, il a la réponse', bot: 'Joueur4', inventaire: { raw_iron: 6, stone_pickaxe: 1 }, enCours: 'collecter',
-    chat: [['SAHYGO', 'qqun a trouve du fer ?', 12], ['Joueur5', 'nan', 6]], raison: 'message de SAHYGO à tout le monde : "qqun a trouve du fer ?"' },
-  { nom: 'il se fait chambrer', bot: 'Joueur4', inventaire: { stone_axe: 1 }, enCours: 'collecter',
-    chat: [['Joueur5', 'joueur4 tes nul tas meme pas de fer mdr', 4]], raison: 'message de Joueur5 : "joueur4 tes nul tas meme pas de fer mdr"' },
-  { nom: 'suite d\'une discussion', bot: 'Joueur5', inventaire: { iron_sword: 1, raw_iron: 3 }, enCours: 'creuser',
-    chat: [['Joueur5', 'jai trouve une grotte', 40], ['SAHYGO', 'elle est ou ?', 20], ['SAHYGO', 'joueur5 ?', 3]],
+  { nom: 'question à tout le monde, il a la réponse', bot: 'tomtom59', inventaire: { raw_iron: 6, stone_pickaxe: 1 }, enCours: 'collecter',
+    chat: [['SAHYGO', 'qqun a trouve du fer ?', 12], ['Kr0nos_', 'nan', 6]], raison: 'message de SAHYGO à tout le monde : "qqun a trouve du fer ?"' },
+  { nom: 'il se fait chambrer', bot: 'tomtom59', inventaire: { stone_axe: 1 }, enCours: 'collecter',
+    chat: [['Kr0nos_', 'joueur4 tes nul tas meme pas de fer mdr', 4]], raison: 'message de Kr0nos_ : "joueur4 tes nul tas meme pas de fer mdr"' },
+  { nom: 'suite d\'une discussion', bot: 'Kr0nos_', inventaire: { iron_sword: 1, raw_iron: 3 }, enCours: 'creuser',
+    chat: [['Kr0nos_', 'jai trouve une grotte', 40], ['SAHYGO', 'elle est ou ?', 20], ['SAHYGO', 'joueur5 ?', 3]],
     raison: 'message de SAHYGO : "joueur5 ?"' },
-  { nom: 'promesse impossible (donner a raté)', bot: 'Joueur4', inventaire: { oak_log: 15 }, enCours: 'collecter',
+  { nom: 'promesse impossible (donner a raté)', bot: 'tomtom59', inventaire: { oak_log: 15 }, enCours: 'collecter',
     historique: [['donner', false, 'Could not find DrAlphaCheat.'], ['donner', false, 'DrAlphaCheat est trop loin pour que tu le voies et tu n as pas ses coordonnées']],
-    chat: [['DrAlphaCheat', 'les 15 de bois je veux bien stp', 120], ['Joueur4', 'je viens te donner les 15 bois tqt', 100], ['DrAlphaCheat', 'tes ou joueur4 ?', 3]],
+    chat: [['DrAlphaCheat', 'les 15 de bois je veux bien stp', 120], ['tomtom59', 'je viens te donner les 15 bois tqt', 100], ['DrAlphaCheat', 'tes ou joueur4 ?', 3]],
     raison: "DrAlphaCheat vient d'écrire : « tes ou joueur4 ? »" },
-  { nom: 'insulte grave', bot: 'Joueur4', inventaire: { oak_log: 3 }, enCours: 'collecter',
+  { nom: 'insulte grave', bot: 'tomtom59', inventaire: { oak_log: 3 }, enCours: 'collecter',
     chat: [['SAHYGO', 'oe ca dit quoi les reuf', 20], ['SAHYGO', 'tg sale noir', 3]], raison: "SAHYGO a écrit à tout le monde : « tg sale noir »" },
-  { nom: 'un joueur arrive près de lui', bot: 'Joueur6', inventaire: { oak_planks: 10 }, enCours: 'construire',
+  { nom: 'un joueur arrive près de lui', bot: 'Lunaa_44', inventaire: { oak_planks: 10 }, enCours: 'construire',
     chat: [], raison: 'SAHYGO arrive près de toi', voit: 'SAHYGO' },
   // --- Répondre au bon message (partie du 19/10 : il ramenait tout à sa promesse de 15 bois) ---
-  { nom: 'frappé par erreur, on lui demande pourquoi', bot: 'Joueur4', inventaire: { oak_log: 4 }, enCours: 'collecter', engagement: 'donner 15 oak_log à DrAlphaCheat', historique: [['donner', false, 'Could not find DrAlphaCheat.']],
-    chat: [['DrAlphaCheat', 'les 15 bois stp', 120], ['Joueur6', 'joueur4 pourquoi tu mas tape ?', 3]], raison: "Joueur6 vient d'écrire : « joueur4 pourquoi tu mas tape ? »",
+  { nom: 'frappé par erreur, on lui demande pourquoi', bot: 'tomtom59', inventaire: { oak_log: 4 }, enCours: 'collecter', engagement: 'donner 15 oak_log à DrAlphaCheat', historique: [['donner', false, 'Could not find DrAlphaCheat.']],
+    chat: [['DrAlphaCheat', 'les 15 bois stp', 120], ['Lunaa_44', 'joueur4 pourquoi tu mas tape ?', 3]], raison: "Lunaa_44 vient d'écrire : « joueur4 pourquoi tu mas tape ? »",
     attendu: "il répond au sujet du coup (excuse, explication, s'énerve...), pas de son bois" },
-  { nom: "quelqu'un a faim", bot: 'Joueur4', inventaire: { oak_log: 4, cooked_beef: 3 }, enCours: 'collecter', engagement: 'donner 15 oak_log à DrAlphaCheat', historique: [['donner', false, 'Could not find DrAlphaCheat.']],
-    chat: [['DrAlphaCheat', 'les 15 bois stp', 120], ['Joueur5', 'joueur4 jai pas de bouffe', 3]], raison: "Joueur5 vient d'écrire : « joueur4 jai pas de bouffe »",
+  { nom: "quelqu'un a faim", bot: 'tomtom59', inventaire: { oak_log: 4, cooked_beef: 3 }, enCours: 'collecter', engagement: 'donner 15 oak_log à DrAlphaCheat', historique: [['donner', false, 'Could not find DrAlphaCheat.']],
+    chat: [['DrAlphaCheat', 'les 15 bois stp', 120], ['Kr0nos_', 'joueur4 jai pas de bouffe', 3]], raison: "Kr0nos_ vient d'écrire : « joueur4 jai pas de bouffe »",
     attendu: 'il parle de nourriture (il a 3 boeufs cuits : il peut en proposer), pas de son bois' },
-  { nom: 'un autre joueur arrive', bot: 'Joueur4', inventaire: { oak_log: 4 }, enCours: 'collecter', engagement: 'donner 15 oak_log à DrAlphaCheat', historique: [['donner', false, 'Could not find DrAlphaCheat.']],
+  { nom: 'un autre joueur arrive', bot: 'tomtom59', inventaire: { oak_log: 4 }, enCours: 'collecter', engagement: 'donner 15 oak_log à DrAlphaCheat', historique: [['donner', false, 'Could not find DrAlphaCheat.']],
     chat: [['DrAlphaCheat', 'les 15 bois stp', 120]], raison: 'SAHYGO arrive près de toi (6 blocs)', voit: 'SAHYGO',
     attendu: "il salue SAHYGO ou ne dit rien, sans parler du bois de DrAlphaCheat" },
-  { nom: "on lui dit qu'on n'a plus besoin", bot: 'Joueur4', inventaire: { oak_log: 4 }, enCours: 'collecter', engagement: 'donner 15 oak_log à DrAlphaCheat', historique: [['donner', false, 'Could not find DrAlphaCheat.']],
+  { nom: "on lui dit qu'on n'a plus besoin", bot: 'tomtom59', inventaire: { oak_log: 4 }, enCours: 'collecter', engagement: 'donner 15 oak_log à DrAlphaCheat', historique: [['donner', false, 'Could not find DrAlphaCheat.']],
     chat: [['DrAlphaCheat', 'les 15 bois stp', 120], ['DrAlphaCheat', 'cest bon joueur4 jai trouve du bois tout seul', 3]],
     raison: "DrAlphaCheat vient d'écrire : « cest bon joueur4 jai trouve du bois tout seul »",
     attendu: "il prend acte (ok, tant mieux), et ne promet plus de bois" },
-  { nom: 'question simple sur ce quil fait', bot: 'Joueur6', inventaire: { oak_planks: 12 }, enCours: 'construire',
+  { nom: 'question simple sur ce quil fait', bot: 'Lunaa_44', inventaire: { oak_planks: 12 }, enCours: 'construire',
     chat: [['SAHYGO', 'joueur6 tu fais quoi la ?', 3]], raison: "SAHYGO vient d'écrire : « joueur6 tu fais quoi la ? »",
     attendu: 'elle dit ce qu\'elle fait (la cabane)' },
 ];
@@ -72,7 +72,7 @@ Explique d'abord en une phrase si la réponse correspond, puis termine par une d
 
 function fauxBot(nom, s, chat) {
   const items = Object.entries(s.inventaire).map(([name, count]) => ({ name, count }));
-  const players = { [nom]: {}, SAHYGO: {}, Joueur4: {}, Joueur5: {}, Joueur6: {} };
+  const players = { [nom]: {}, SAHYGO: {}, tomtom59: {}, Kr0nos_: {}, Lunaa_44: {} };
   if (s.voit) players[s.voit] = { username: s.voit, entity: { position: new Vec3(5, 64, 0), height: 1.8 } };
   return {
     username: nom, entity: { position: new Vec3(0, 64, 0) }, players, entities: {}, health: 20, food: 18,
@@ -93,7 +93,7 @@ async function main() {
       const decisions = [];
       const logger = { gameId: 'banc', write: (type, d) => { if (type === 'decisions') decisions.push(d); } };
       const profil = profils.find((p) => p.username === s.bot);
-      const a = new Agent(profil, { cfg: { ...cfg, agent: { ...cfg.agent, humanize: false, mission: '' }, game: { ...cfg.game, agents: ['Joueur4', 'Joueur5', 'Joueur6'] } }, gateway, logger });
+      const a = new Agent(profil, { cfg: { ...cfg, agent: { ...cfg.agent, humanize: false, mission: '' }, game: { ...cfg.game, agents: ['tomtom59', 'Kr0nos_', 'Lunaa_44'] } }, gateway, logger });
       a.mcData = registry;
       a.bot = fauxBot(s.bot, s, envoyes);
       a.lancerAction = () => {};

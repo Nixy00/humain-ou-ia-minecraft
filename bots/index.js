@@ -42,6 +42,7 @@ console.log(`Partie ${cfg.game.id} : journaux dans ${cfg.game.logDir}`);
 
 // Liste de tous les agents : sert à savoir si un humain est connecté.
 cfg.game.agents = profiles.map((p) => p.username);
+cfg.game.surnoms = Object.fromEntries(profiles.map((p) => [p.username, p.surnoms || []]));
 const agents = selected.map((p) => new Agent(p, { cfg, gateway, logger }));
 // Arrivées étalées : des connexions simultanées trahiraient les agents.
 agents.forEach((a, i) => setTimeout(() => a.start(), i === 0 ? 0 : uniform(2000, cfg.agent.joinDelayMaxMs)));

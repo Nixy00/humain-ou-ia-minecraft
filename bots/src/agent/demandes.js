@@ -51,9 +51,15 @@ function dejaRepondu(chat, demandeur, depuis, moi) {
 
 // Un message qui cite un autre joueur s'adresse à lui : avant, les 3 bots répondaient à tout,
 // ("je suis avec toi joueur 4" -> c'est Joueur6 qui répondait "ah ouais pas mal").
-function citeUnAutre(texte, moi, joueurs) {
+function citeUnAutre(texte, moi, joueurs, surnoms = {}) {
+  return joueurs.some((j) => j !== moi && estCite(texte, [j, ...(surnoms[j] || [])]));
+}
+
+// Un joueur écrit rarement le pseudo en entier ("tom" pour "tomtom59") : on cherche le pseudo ou un surnom,
+// en mot entier ("tom" ne doit pas être trouvé dans "atomes"). Un pseudo Minecraft n'a que lettres, chiffres et _.
+function estCite(texte, noms) {
   const t = texte.toLowerCase().replace(/joueur\s+(\d)/g, 'joueur$1'); // "joueur 4" = "Joueur4"
-  return joueurs.some((j) => j !== moi && t.includes(j.toLowerCase()));
+  return noms.some((n) => new RegExp(`(^|[^a-z0-9_])${n.toLowerCase()}($|[^a-z0-9_])`).test(t));
 }
 
 // Messages sans contenu auxquels personne ne répond ("merci", "ok", "tkt"...) : sinon les bots
@@ -69,4 +75,4 @@ function positionAnnoncee(texte) {
   return m[3] !== undefined ? { x: +m[1], y: +m[2], z: +m[3] } : { x: +m[1], z: +m[2] };
 }
 
-module.exports = { objetDemande, coutDemande, delaiReaction, dejaRepondu, citeUnAutre, sansContenu, positionAnnoncee };
+module.exports = { objetDemande, coutDemande, delaiReaction, dejaRepondu, citeUnAutre, estCite, sansContenu, positionAnnoncee };

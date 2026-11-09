@@ -469,7 +469,7 @@ test('profils : l etape suit le premier objectif pas encore atteint', async () =
   const { Agent } = require('../src/agent/agent');
   const mc = await import('../src/mindcraft/mcdata.mjs');
   mc.init('1.20.4');
-  const profil = require('../agents.json').find((p) => p.username === 'Joueur5');
+  const profil = require('../agents.json').find((p) => p.username === 'Kr0nos_');
   const a = new Agent(profil, { cfg: { agent: { mission: '' } }, gateway: {}, logger: {} });
   a.recettes = mc.getItemCraftingRecipes;
   a.mcData = require('minecraft-data')('1.20.4');
@@ -497,7 +497,7 @@ test('builder : il va chercher des planches avant de construire', async () => {
   const { Agent } = require('../src/agent/agent');
   const mc = await import('../src/mindcraft/mcdata.mjs');
   mc.init('1.20.4');
-  const profil = require('../agents.json').find((p) => p.username === 'Joueur6');
+  const profil = require('../agents.json').find((p) => p.username === 'Lunaa_44');
   const a = new Agent(profil, { cfg: { agent: { mission: '' } }, gateway: {}, logger: {} });
   a.recettes = mc.getItemCraftingRecipes;
   a.mcData = require('minecraft-data')('1.20.4');
@@ -834,4 +834,13 @@ test('sous terre : selon la lumiere du ciel, pas selon la hauteur', () => {
   const bot = (lumiere) => ({ entity: { position: new Vec3(0, -60, 0) }, blockAt: () => ({ skyLight: lumiere }) });
   assert.strictEqual(sousTerre(bot(15)), false); // map plate, en plein air à y = -60
   assert.strictEqual(sousTerre(bot(0)), true);
+});
+
+test('pseudos : on parle a un bot par son pseudo ou un surnom, en mot entier', () => {
+  const { estCite, citeUnAutre } = require('../src/agent/demandes');
+  assert.ok(estCite('tom tes ou ?', ['tomtom59', 'tom']));
+  assert.ok(estCite('TOMTOM59 viens', ['tomtom59', 'tom']));
+  assert.ok(!estCite('jai trouve des atomes', ['tomtom59', 'tom']));
+  assert.ok(citeUnAutre('luna tas du bois ?', 'tomtom59', ['tomtom59', 'Lunaa_44'], { Lunaa_44: ['luna'] }));
+  assert.ok(!citeUnAutre('luna tas du bois ?', 'Lunaa_44', ['tomtom59', 'Lunaa_44'], { Lunaa_44: ['luna'] }));
 });

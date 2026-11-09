@@ -3,15 +3,15 @@
 # un bot qui calcule un long chemin ne fige plus les autres, chacun a sa file d'appels au modèle,
 # et si l'un plante il redémarre seul sans faire tomber les deux autres.
 #
-# Utilisation : ./lancer.sh                      -> Joueur4, Joueur5 et Joueur6
-#               ./lancer.sh Joueur4 Joueur6      -> seulement ceux-là
+# Utilisation : ./lancer.sh                      -> tomtom59, Kr0nos_ et Lunaa_44
+#               ./lancer.sh tomtom59 Lunaa_44      -> seulement ceux-là
 #               timeout 3600 ./lancer.sh         -> arrêt automatique au bout d'une heure
-# Les journaux de la partie sont dans data/parties/$GAME_ID/ (un fichier par bot : actions-Joueur4.jsonl...).
+# Les journaux de la partie sont dans data/parties/$GAME_ID/ (un fichier par bot : actions-tomtom59.jsonl...).
 # Attention : LLM_BUDGET_TOKENS (.env) compte maintenant pour CHAQUE bot.
 
 cd "$(dirname "$0")"
 export GAME_ID="${GAME_ID:-partie-$(date +%m%d-%H%M)}"
-BOTS="${*:-Joueur4 Joueur5 Joueur6}"
+BOTS="${*:-tomtom59 Kr0nos_ Lunaa_44}"
 
 # À l'arrêt (fin du timeout, Ctrl+C), on arrête tout le groupe : les boucles ET les programmes node des bots
 # (arrêter seulement les boucles laissait les bots connectés).

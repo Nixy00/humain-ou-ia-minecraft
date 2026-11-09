@@ -12,7 +12,7 @@ const { STYLE_DEFAUT, messageDelayMs, fauteDeFrappe, ecrireCommeJoueur, enleverA
 const { startReflexes } = require('./reflexes');
 const { prochaineEtape, objetDeMission, objectifDuMoment } = require('./plan');
 const { NB_BLOCS } = require('./construction');
-const { objetDemande, coutDemande, delaiReaction, dejaRepondu, citeUnAutre, sansContenu, positionAnnoncee } = require('./demandes');
+const { objetDemande, coutDemande, delaiReaction, dejaRepondu, citeUnAutre, estCite, sansContenu, positionAnnoncee } = require('./demandes');
 const { callTool } = require('../llm/structured');
 
 const HUMEURS = ['motivé', 'normal', 'normal', 'un peu fatigué', 'de bonne humeur'];
@@ -21,8 +21,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 
 class Agent {
-  constructor({ username, persona, style, envie, objectifs, caractere, vie, repliques, role, mission, interdits, outilsInterdits }, { cfg, gateway, logger }) {
+  constructor({ username, surnoms, persona, style, envie, objectifs, caractere, vie, repliques, role, mission, interdits, outilsInterdits }, { cfg, gateway, logger }) {
     this.username = username;
+    this.surnoms = surnoms || []; // comment les autres l'appellent dans le chat ("tom" pour tomtom59)
     this.persona = persona;
     this.objectifs = objectifs || [];
     this.vie = vie || ''; // sa vie hors du jeu, pour parler d'autre chose (une série, la météo chez lui...)
@@ -124,7 +125,7 @@ class Agent {
       // Un message à tout le monde ("vous", "qq1", "allo y'a quelqu'un") le concerne aussi :
       // pendant un test, "bande de fou allez me chercher..." et "vous pouvez parler ???" n'ont eu aucune réponse.
       // "joueur 4" (avec un espace) = "Joueur4" : avant, "je suis avec toi joueur 4" n'était pas compris comme pour lui.
-      const nomme = text.toLowerCase().replace(/joueur\s+(\d)/g, 'joueur$1').includes(this.username.toLowerCase());
+      const nomme = estCite(text, [this.username, ...this.surnoms]);
       const pourTous = !seulsTousLesDeux && !nomme && /(vous|tout le monde|qq1|qqun|quelqu'un|quelquun|personne|les gars)/i.test(text);
       const pourMoi = seulsTousLesDeux || nomme || pourTous;
       // Un vrai joueur cité ne répond que 2 fois sur 3 dans les 2 minutes (analyse/rythme_chat.py) :
@@ -132,7 +133,7 @@ class Agent {
       const plusTard = this.cfg.agent.humanize && !seulsTousLesDeux && this.actionEnCours && Math.random() < 0.3;
       // Pas pour lui : il ne s'en mêle presque jamais si le message vise un autre joueur ou ne dit rien ("merci", "ok"),
       // et rarement sinon (avant, chaque bot avait style.bavard chances de répondre à TOUT, même entre bots).
-      const pasPourMoi = citeUnAutre(text, this.username, Object.keys(bot.players)) || sansContenu(text);
+      const pasPourMoi = citeUnAutre(text, this.username, Object.keys(bot.players), this.cfg.game && this.cfg.game.surnoms) || sansContenu(text);
       const chanceDeSenMeler = pasPourMoi ? 0.03 : this.style.bavard * 0.3;
       const reagir = !plusTard && (pourMoi || !this.cfg.agent.humanize || Math.random() < chanceDeSenMeler);
       // Il retient les coordonnées qu'un joueur donne ("je suis en 0 0") pour pouvoir aller le voir ou lui donner un objet.
